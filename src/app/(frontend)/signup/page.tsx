@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { checkSignupEmail, signUpCustomer } from '@/features/user/api'
+import { loadPostcode, postcodeError } from '@/features/user/postcode'
 import { ApiRequestError } from '@/lib/api-client'
 
 const inputBaseClass =
@@ -52,9 +53,13 @@ export default function SignupPage() {
   const [address, setAddress] = useState('')
   const [detail, setDetail] = useState('')
   const [termsConsent, setTermsConsent] = useState({ serviceTerms: false, privacyPolicy: false })
+  const [postcodeMessage, setPostcodeMessage] = useState('')
   const [error, setError] = useState<FormError | null>(null)
   const [pending, setPending] = useState(false)
   const emailRequest = useRef<AbortController | null>(null)
+  const postcodeDialog = useRef<HTMLDialogElement>(null)
+  const postcodeHost = useRef<HTMLDivElement>(null)
+  const postcodeSession = useRef<symbol | null>(null)
   const detailAddress = useRef<HTMLInputElement>(null)
   const normalizedEmail = email.trim()
   const currentEmailCheck = emailCheck?.email === normalizedEmail ? emailCheck : null
@@ -108,8 +113,50 @@ export default function SignupPage() {
     }
   }, [email])
 
-  function searchAddress() {
-    setError({ message: '주소 검색 기능은 아직 연결되지 않았습니다. 우편번호와 주소를 직접 입력해 주세요.' })
+  function closeAddressSearch() {
+    postcodeSession.current = null
+    postcodeHost.current?.replaceChildren()
+    postcodeDialog.current?.close()
+    setPostcodeMessage('')
+  }
+
+  async function searchAddress() {
+    const dialog = postcodeDialog.current
+    const host = postcodeHost.current
+    if (!dialog || !host || dialog.open) return
+    const session = Symbol()
+    postcodeSession.current = session
+    // SDK 로딩 중 모달을 닫았다가 다시 열 수 있어, 이전 검색의 콜백이 새 화면을 변경하지 않게 구분합니다.
+    const isCurrent = () => dialog.isConnected && dialog.open && postcodeSession.current === session
+    dialog.showModal()
+    setPostcodeMessage('주소 검색을 불러오는 중입니다.')
+    try {
+      const Postcode = await loadPostcode()
+      if (!isCurrent()) return
+      setPostcodeMessage('')
+      new Postcode({
+        width: '100%',
+        height: '100%',
+        minWidth: 240,
+        oncomplete({ zonecode, roadAddress }) {
+          if (!isCurrent()) return
+          if (!zonecode || !roadAddress) {
+            setPostcodeMessage('도로명 주소가 포함된 검색 결과를 선택해 주세요.')
+            return
+          }
+          // 선택한 우편번호와 도로명 주소를 각각 우편번호와 기본 주소 칸에 채웁니다.
+          // 새 배송지에 맞게 상세 주소를 비우고 해당 칸으로 포커스를 옮깁니다.
+          setPostalCode(zonecode)
+          setAddress(roadAddress)
+          setDetail('')
+          setError(null)
+          closeAddressSearch()
+          detailAddress.current?.focus()
+        },
+      }).embed(host, { autoClose: false })
+    } catch {
+      if (isCurrent()) setPostcodeMessage(postcodeError)
+    }
   }
 
   function submitSignup(event: FormEvent<HTMLFormElement>) {
@@ -336,6 +383,22 @@ export default function SignupPage() {
           ← BACK TO STORE
         </Link>
       </div>
+      <dialog
+        aria-labelledby="signup-postcode-title"
+        className={dialogClass}
+        onCancel={(event) => {
+          event.preventDefault()
+          closeAddressSearch()
+        }}
+        ref={postcodeDialog}
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-xl font-medium" id="signup-postcode-title">주소 검색</h2>
+          <button className={outlineButton} onClick={closeAddressSearch} type="button">닫기</button>
+        </div>
+        {postcodeMessage && <p className="text-sm text-zinc-700" role="status">{postcodeMessage}</p>}
+        <div className="h-[min(55vh,440px)]" ref={postcodeHost} />
+      </dialog>
     </section>
   )
 }

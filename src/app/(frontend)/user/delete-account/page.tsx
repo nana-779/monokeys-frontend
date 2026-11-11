@@ -30,6 +30,7 @@ function WithdrawalForm({ session }: {
   const [verified, setVerified] = useState(false)
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
+  const confirmation = useRef<HTMLDialogElement>(null)
 
   // 비밀번호 확인은 일치 여부만 조회하고, 일치하면 최종 확인 버튼을 활성화합니다.
   async function verifyPassword(event: FormEvent<HTMLFormElement>) {
@@ -44,6 +45,24 @@ function WithdrawalForm({ session }: {
       setVerified(matches)
       setMessage(matches ? '비밀번호를 확인했습니다.' : '비밀번호가 일치하지 않습니다.')
     } catch (error) {
+      setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  // 모달에서 확정한 경우에만 최종 탈퇴를 요청합니다. 서버가 현재 비밀번호를 다시 확인합니다.
+  async function withdraw() {
+    if (!session || !verified || pending) return
+    const request = new AbortController()
+    setPending(true)
+    setMessage('')
+    try {
+      await deleteCustomerAccount(password, request.signal)
+      confirmation.current?.close()
+    } catch (error) {
+      confirmation.current?.close()
+      setVerified(false)
       setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
     } finally {
       setPending(false)
@@ -81,6 +100,14 @@ function WithdrawalForm({ session }: {
               </button>
             </form>
             {message && <p className={verified ? 'text-sm' : 'text-sm text-red-700'} role={verified ? 'status' : 'alert'}>{message}</p>}
+            <button
+              className={primaryButton}
+              disabled={!verified || pending}
+              onClick={() => confirmation.current?.showModal()}
+              type="button"
+            >
+              최종 탈퇴 확인
+            </button>
           </>
         ) : (
           <p className="text-sm text-zinc-600">
@@ -90,6 +117,21 @@ function WithdrawalForm({ session }: {
         )}
         <p><Link className="text-sm underline underline-offset-4" href="/mypage">마이페이지로 돌아가기</Link></p>
       </div>
+      <dialog
+        aria-labelledby="withdrawal-confirm-title"
+        className="m-auto w-[min(92%,420px)] rounded-xl border border-zinc-200 p-6 shadow-xl backdrop:bg-black/50"
+        onCancel={(event) => { if (pending) event.preventDefault() }}
+        ref={confirmation}
+      >
+        <h2 className="text-xl font-medium" id="withdrawal-confirm-title">회원탈퇴 확인</h2>
+        <p className="mt-3 text-sm text-zinc-600">회원탈퇴를 진행하시겠습니까?</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button className={outlineButton} disabled={pending} onClick={() => confirmation.current?.close()} type="button">취소</button>
+          <button className={primaryButton} disabled={pending || !verified} onClick={withdraw} type="button">
+            {pending ? '처리 중…' : '탈퇴하기'}
+          </button>
+        </div>
+      </dialog>
     </>
   )
 }

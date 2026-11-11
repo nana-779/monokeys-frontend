@@ -17,7 +17,11 @@ export class ApiRequestError extends Error {
 }
 
 // 모든 API 요청에 JSON 헤더와 세션 쿠키를 공통 적용합니다.
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  expectedStatus?: number,
+): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
@@ -39,6 +43,10 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     throw new ApiRequestError(detail || `API request failed (${response.status})`, response.status)
   }
 
+  // 가입은 약속된 201 응답을 받은 경우에만 완료하며, 상태를 지정하지 않은 기존 호출은 그대로 처리합니다.
+  if (expectedStatus !== undefined && response.status !== expectedStatus) {
+    throw new ApiRequestError('서버 응답을 확인하지 못했습니다. 다시 시도해 주세요.', response.status)
+  }
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }

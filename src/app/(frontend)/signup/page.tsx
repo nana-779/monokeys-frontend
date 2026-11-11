@@ -30,7 +30,7 @@ const terms = [
 ] as const
 
 type EmailCheck = { email: string; available: boolean; message: string }
-type FormError = { message: string }
+type FormError = { message: string; fields?: Record<string, string> }
 
 // 서버와 같은 정책으로 제출 전에 안내합니다. 브라우저 검사는 우회할 수 있으므로 최종 검증은 서버가 다시 수행합니다.
 function validPassword(password: string) {
@@ -56,6 +56,7 @@ export default function SignupPage() {
   const [postcodeMessage, setPostcodeMessage] = useState('')
   const [error, setError] = useState<FormError | null>(null)
   const [pending, setPending] = useState(false)
+  const submitLock = useRef(false)
   const emailRequest = useRef<AbortController | null>(null)
   const postcodeDialog = useRef<HTMLDialogElement>(null)
   const postcodeHost = useRef<HTMLDivElement>(null)
@@ -159,14 +160,39 @@ export default function SignupPage() {
     }
   }
 
-  function submitSignup(event: FormEvent<HTMLFormElement>) {
+  // 재입력 칸에서 벗어나기 전에 제출해도 불일치를 표시하고 요청을 막습니다.
+  // 필수 조건을 모두 충족하면 한 번만 요청하며, 201 응답 뒤 완료 안내를 엽니다.
+  async function submitSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (submitLock.current) return
     setPasswordConfirmTouched(true)
     if (!passwordsMatch || !canSubmit) return
-    setError({ message: '회원가입 기능은 아직 연결되지 않았습니다.' })
+    setError(null)
+    // 상태 갱신이 화면에 반영되기 전 연속 제출도 막기 위해 pending과 별도로 즉시 잠급니다.
+    submitLock.current = true
+    setPending(true)
+    try {
+      await signUpCustomer({
+        email: normalizedEmail, password, name: name.trim(), phone, postalCode: postalCode.trim(),
+        address: address.trim(), detailAddress: detail.trim(), termsConsent,
+      })
+    } catch (cause) {
+      if (cause instanceof ApiRequestError) {
+        setError({ message: cause.message, fields: cause.fieldErrors })
+        if (cause.status === 409) {
+          setEmailCheck({ email: normalizedEmail, available: false, message: cause.message })
+        }
+      } else {
+        setError({ message: '서버 연결에 실패했습니다. 다시 시도해 주세요.' })
+      }
+    } finally {
+      submitLock.current = false
+      setPending(false)
+    }
   }
 
-  const emailFeedback = (email && !emailValid ? '올바른 이메일 형식으로 입력해 주세요.'
+  const fields = error?.fields
+  const emailFeedback = fields?.email || (email && !emailValid ? '올바른 이메일 형식으로 입력해 주세요.'
     : currentEmailCheck?.message || (emailValid ? '이메일 중복을 확인하고 있습니다.' : ''))
 
   return (
@@ -226,7 +252,7 @@ export default function SignupPage() {
             value={password}
           />
           <span className="mt-1 block text-xs text-zinc-600" id="signup-password-feedback">
-            {(password && !passwordValid ? '8~20자이며 영문과 숫자를 포함해야 합니다.' : '')}
+            {fields?.password || (password && !passwordValid ? '8~20자이며 영문과 숫자를 포함해야 합니다.' : '')}
           </span>
         </label>
 
@@ -267,6 +293,7 @@ export default function SignupPage() {
           <input autoComplete="name" className={inputClass} disabled={disabled} maxLength={50}
             name="name" onChange={(event) => setName(event.target.value)} placeholder="이름을 입력해 주세요"
             required value={name} />
+          {fields?.name && <span className="mt-1 block text-xs text-red-700">{fields.name}</span>}
         </label>
 
         <label className="block text-sm font-medium text-zinc-800">
@@ -285,9 +312,9 @@ export default function SignupPage() {
             type="tel"
             value={[phone.slice(0, 3), phone.slice(3, 7), phone.slice(7)].filter(Boolean).join('-')}
           />
-          {(phoneTouched && !phoneValid) && (
+          {(fields?.phoneNumber || (phoneTouched && !phoneValid)) && (
             <span className="mt-1 block text-xs text-red-700">
-              {'010으로 시작하는 11자리 연락처를 입력해 주세요.'}
+              {fields?.phoneNumber || '010으로 시작하는 11자리 연락처를 입력해 주세요.'}
             </span>
           )}
         </label>
@@ -330,6 +357,9 @@ export default function SignupPage() {
             ref={detailAddress}
             required
           />
+          {['defaultAddress', 'defaultAddress.zonecode', 'defaultAddress.roadAddress', 'defaultAddress.detailAddress'].map(
+            (field) => fields?.[field] && <p className="text-xs text-red-700" key={field}>{fields[field]}</p>,
+          )}
         </fieldset>
 
         <fieldset className="space-y-3 border-t border-zinc-200 pt-5" disabled={disabled}>
@@ -356,6 +386,7 @@ export default function SignupPage() {
               </details>
             </div>
           ))}
+          {fields?.termsConsent && <p className="text-xs text-red-700">{fields.termsConsent}</p>}
         </fieldset>
 
         {error && (

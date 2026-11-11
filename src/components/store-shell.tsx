@@ -42,6 +42,18 @@ export function StoreShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [pathname]);
 
+  // 가입 완료 또는 로그인 안내에서 스토어로 이동하면 기존 계정 패널을 로그인 모드로 엽니다.
+  useEffect(() => {
+    if (pathname !== "/" || new URLSearchParams(window.location.search).get("login") !== "1") return;
+    const frame = window.requestAnimationFrame(() => {
+      closeCart();
+      setAuthError("");
+      setAuthMode("login");
+      setAuthOpen(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname, closeCart]);
+
   const openAccount = () => {
     closeCart();
     setAuthError("");

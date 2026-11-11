@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { checkSignupEmail, signUpCustomer } from '@/features/user/api'
 import { loadPostcode, postcodeError } from '@/features/user/postcode'
@@ -41,6 +42,7 @@ function validPassword(password: string) {
 
 /** 가입 입력과 사전 확인, 주소 선택, 제출 결과를 관리합니다. HTTP 요청 형식과 오류 해석은 회원 API에 맡깁니다. */
 export default function SignupPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [emailCheck, setEmailCheck] = useState<EmailCheck | null>(null)
   const [password, setPassword] = useState('')
@@ -56,17 +58,19 @@ export default function SignupPage() {
   const [postcodeMessage, setPostcodeMessage] = useState('')
   const [error, setError] = useState<FormError | null>(null)
   const [pending, setPending] = useState(false)
+  const [completed, setCompleted] = useState(false)
   const submitLock = useRef(false)
   const emailRequest = useRef<AbortController | null>(null)
   const postcodeDialog = useRef<HTMLDialogElement>(null)
   const postcodeHost = useRef<HTMLDivElement>(null)
   const postcodeSession = useRef<symbol | null>(null)
   const detailAddress = useRef<HTMLInputElement>(null)
+  const successDialog = useRef<HTMLDialogElement>(null)
   const normalizedEmail = email.trim()
   const currentEmailCheck = emailCheck?.email === normalizedEmail ? emailCheck : null
   const available = currentEmailCheck?.available === true
   const emailValid = emailPattern.test(normalizedEmail) && normalizedEmail.length <= 100
-  const disabled = pending
+  const disabled = pending || completed
   // 재입력 칸에서 벗어나거나 가입을 시도하면 불일치를 표시합니다.
   // 그 뒤에는 두 칸의 현재 값을 비교해 어느 쪽을 수정해도 안내를 갱신합니다.
   const passwordsMatch = password === passwordConfirm
@@ -164,7 +168,7 @@ export default function SignupPage() {
   // 필수 조건을 모두 충족하면 한 번만 요청하며, 201 응답 뒤 완료 안내를 엽니다.
   async function submitSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (submitLock.current) return
+    if (submitLock.current || completed) return
     setPasswordConfirmTouched(true)
     if (!passwordsMatch || !canSubmit) return
     setError(null)
@@ -176,6 +180,11 @@ export default function SignupPage() {
         email: normalizedEmail, password, name: name.trim(), phone, postalCode: postalCode.trim(),
         address: address.trim(), detailAddress: detail.trim(), termsConsent,
       })
+      setPassword('')
+      setPasswordConfirm('')
+      setCompleted(true)
+      // 완료 안내에서 확인을 누르면 스토어로 이동하고 기존 로그인 패널을 엽니다.
+      successDialog.current?.showModal()
     } catch (cause) {
       if (cause instanceof ApiRequestError) {
         setError({ message: cause.message, fields: cause.fieldErrors })
@@ -403,7 +412,7 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-zinc-500">
           이미 계정이 있으신가요?{' '}
-          <Link className="font-semibold text-zinc-900 underline underline-offset-4" href="/">
+          <Link className="font-semibold text-zinc-900 underline underline-offset-4" href="/?login=1">
             스토어에서 로그인
           </Link>
         </p>
@@ -429,6 +438,21 @@ export default function SignupPage() {
         </div>
         {postcodeMessage && <p className="text-sm text-zinc-700" role="status">{postcodeMessage}</p>}
         <div className="h-[min(55vh,440px)]" ref={postcodeHost} />
+      </dialog>
+      <dialog
+        aria-labelledby="signup-success"
+        className={dialogClass}
+        onCancel={(event) => event.preventDefault()}
+        ref={successDialog}
+      >
+        <h2 className="text-xl font-medium" id="signup-success">회원가입이 완료되었습니다.</h2>
+        <button
+          className="mt-5 h-12 rounded-md bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800"
+          onClick={() => router.replace('/?login=1')}
+          type="button"
+        >
+          확인
+        </button>
       </dialog>
     </section>
   )

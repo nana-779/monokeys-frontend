@@ -19,11 +19,18 @@ export async function signUpCustomer(_input: CustomerSignupRequest): Promise<voi
 async function requestWithdrawal<T>(
   path: string, method: 'POST' | 'DELETE', password: string, status: number, signal: AbortSignal,
 ): Promise<T> {
-  return apiRequest<T>(path, {
-    method,
-    signal,
-    body: JSON.stringify({ password }),
-  }, status)
+  try {
+    return await apiRequest<T>(path, {
+      method,
+      signal,
+      body: JSON.stringify({ password }),
+    }, status)
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      throw new Error('로그인 정보를 다시 확인해 주세요.')
+    }
+    throw error
+  }
 }
 
 // POST는 비밀번호 일치 여부를 받고, 실제 계정 처리는 아래 DELETE에서 수행합니다.

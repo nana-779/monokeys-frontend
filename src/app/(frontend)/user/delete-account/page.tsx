@@ -14,10 +14,11 @@ const cardClass = 'space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shad
 /** 실제 인증에서 전달할 사용자 상태를 기준으로 탈퇴 폼을 표시합니다. 인증 Provider는 아직 미연동입니다. */
 export default function DeleteAccountPage() {
   const session = useWithdrawalSession()
+  const formKey = session ? JSON.stringify([session.user.id, session.sessionVersion]) : 'guest'
   return (
     <section className="mx-auto w-[min(92%,560px)] py-14 sm:py-20">
       <h1 className="mb-8 text-center text-4xl font-medium tracking-[-0.06em] sm:text-5xl">회원탈퇴</h1>
-      <WithdrawalForm session={session} />
+      <WithdrawalForm key={formKey} session={session} />
     </section>
   )
 }
@@ -30,42 +31,54 @@ function WithdrawalForm({ session }: {
   const [verified, setVerified] = useState(false)
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
+  const activeRequest = useRef<AbortController | null>(null)
   const confirmation = useRef<HTMLDialogElement>(null)
+
+  // 세션 변경이나 화면 이동으로 이전 폼이 사라지면 늦은 응답을 반영하지 않습니다.
+  // 요청 취소는 브라우저의 응답 처리를 중단할 뿐, 서버에서 이미 진행된 탈퇴를 되돌리지는 않습니다.
+  useLayoutEffect(() => () => activeRequest.current?.abort(), [])
 
   // 비밀번호 확인은 일치 여부만 조회하고, 일치하면 최종 확인 버튼을 활성화합니다.
   async function verifyPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!session || !password.trim() || pending) return
+    if (!session || !password.trim() || activeRequest.current) return
     const request = new AbortController()
+    activeRequest.current = request
     setPending(true)
     setVerified(false)
     setMessage('')
     try {
       const matches = await verifyWithdrawalPassword(password, request.signal)
+      if (request.signal.aborted) return
       setVerified(matches)
       setMessage(matches ? '비밀번호를 확인했습니다.' : '비밀번호가 일치하지 않습니다.')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
+      if (!request.signal.aborted) setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
     } finally {
-      setPending(false)
+      activeRequest.current = null
+      if (!request.signal.aborted) setPending(false)
     }
   }
 
   // 모달에서 확정한 경우에만 최종 탈퇴를 요청합니다. 서버가 현재 비밀번호를 다시 확인합니다.
   async function withdraw() {
-    if (!session || !verified || pending) return
+    if (!session || !verified || activeRequest.current) return
     const request = new AbortController()
+    activeRequest.current = request
     setPending(true)
     setMessage('')
     try {
       await deleteCustomerAccount(password, request.signal)
+      if (request.signal.aborted) return
       confirmation.current?.close()
     } catch (error) {
+      if (request.signal.aborted) return
       confirmation.current?.close()
       setVerified(false)
       setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
     } finally {
-      setPending(false)
+      activeRequest.current = null
+      if (!request.signal.aborted) setPending(false)
     }
   }
 
@@ -120,7 +133,7 @@ function WithdrawalForm({ session }: {
       <dialog
         aria-labelledby="withdrawal-confirm-title"
         className="m-auto w-[min(92%,420px)] rounded-xl border border-zinc-200 p-6 shadow-xl backdrop:bg-black/50"
-        onCancel={(event) => { if (pending) event.preventDefault() }}
+        onCancel={(event) => { if (activeRequest.current) event.preventDefault() }}
         ref={confirmation}
       >
         <h2 className="text-xl font-medium" id="withdrawal-confirm-title">회원탈퇴 확인</h2>

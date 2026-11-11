@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { signUpCustomer } from '@/features/user/api'
+import { checkSignupEmail, signUpCustomer } from '@/features/user/api'
 import { ApiRequestError } from '@/lib/api-client'
 
 const inputBaseClass =
@@ -28,6 +28,7 @@ const terms = [
   },
 ] as const
 
+type EmailCheck = { email: string; available: boolean; message: string }
 type FormError = { message: string }
 
 // 서버와 같은 정책으로 제출 전에 안내합니다. 브라우저 검사는 우회할 수 있으므로 최종 검증은 서버가 다시 수행합니다.
@@ -40,6 +41,7 @@ function validPassword(password: string) {
 /** 가입 입력과 사전 확인, 주소 선택, 제출 결과를 관리합니다. HTTP 요청 형식과 오류 해석은 회원 API에 맡깁니다. */
 export default function SignupPage() {
   const [email, setEmail] = useState('')
+  const [emailCheck, setEmailCheck] = useState<EmailCheck | null>(null)
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [passwordConfirmTouched, setPasswordConfirmTouched] = useState(false)
@@ -52,8 +54,11 @@ export default function SignupPage() {
   const [termsConsent, setTermsConsent] = useState({ serviceTerms: false, privacyPolicy: false })
   const [error, setError] = useState<FormError | null>(null)
   const [pending, setPending] = useState(false)
+  const emailRequest = useRef<AbortController | null>(null)
   const detailAddress = useRef<HTMLInputElement>(null)
   const normalizedEmail = email.trim()
+  const currentEmailCheck = emailCheck?.email === normalizedEmail ? emailCheck : null
+  const available = currentEmailCheck?.available === true
   const emailValid = emailPattern.test(normalizedEmail) && normalizedEmail.length <= 100
   const disabled = pending
   // 재입력 칸에서 벗어나거나 가입을 시도하면 불일치를 표시합니다.
@@ -63,8 +68,45 @@ export default function SignupPage() {
   const passwordValid = validPassword(password)
   const phoneValid = phonePattern.test(phone)
   const hasRequiredFields = !!(name.trim() && postalCode.trim() && address.trim() && detail.trim())
-  const canSubmit = emailValid && passwordValid && phoneValid
+  const canSubmit = available && passwordValid && phoneValid
     && hasRequiredFields && termsConsent.serviceTerms && termsConsent.privacyPolicy
+
+  // 형식이 맞는 이메일의 입력이 500ms 동안 멈추면 중복을 확인합니다.
+  // 이메일을 바꾸면 이전 결과를 지우고 요청을 취소해 현재 주소의 결과만 사용합니다.
+  useEffect(() => {
+    const addressToCheck = email.trim()
+    if (!emailPattern.test(addressToCheck) || addressToCheck.length > 100) return
+
+    // 이전 이메일의 응답이 나중에 도착해도 현재 입력의 중복 확인 결과를 덮어쓰지 않도록 요청마다 취소 신호를 둡니다.
+    const request = new AbortController()
+    emailRequest.current = request
+    const timer = window.setTimeout(async () => {
+      try {
+        const available = await checkSignupEmail(addressToCheck, request.signal)
+        if (!request.signal.aborted) {
+          setEmailCheck({
+            email: addressToCheck,
+            available,
+            message: available ? '사용 가능한 이메일입니다.' : '중복된 이메일입니다.',
+          })
+        }
+      } catch (error) {
+        if (!request.signal.aborted) {
+          setEmailCheck({
+            email: addressToCheck,
+            available: false,
+            message: error instanceof ApiRequestError && error.status === 400
+              ? error.message
+              : '이메일을 확인하지 못했습니다. 입력을 수정한 뒤 다시 시도해 주세요.',
+          })
+        }
+      }
+    }, 500)
+    return () => {
+      window.clearTimeout(timer)
+      request.abort()
+    }
+  }, [email])
 
   function searchAddress() {
     setError({ message: '주소 검색 기능은 아직 연결되지 않았습니다. 우편번호와 주소를 직접 입력해 주세요.' })
@@ -78,7 +120,7 @@ export default function SignupPage() {
   }
 
   const emailFeedback = (email && !emailValid ? '올바른 이메일 형식으로 입력해 주세요.'
-    : '')
+    : currentEmailCheck?.message || (emailValid ? '이메일 중복을 확인하고 있습니다.' : ''))
 
   return (
     <section className="mx-auto w-[min(92%,560px)] py-14 sm:py-20">
@@ -103,7 +145,9 @@ export default function SignupPage() {
             maxLength={100}
             name="email"
             onChange={(event) => {
+              emailRequest.current?.abort()
               setEmail(event.target.value)
+              setEmailCheck(null)
               setError(null)
             }}
             placeholder="example@email.com"

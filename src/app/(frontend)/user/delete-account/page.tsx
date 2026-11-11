@@ -11,20 +11,49 @@ const primaryButton = 'h-12 rounded-md bg-zinc-950 px-4 text-sm font-semibold te
 
 const cardClass = 'space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-9'
 
-/** 실제 인증에서 전달할 사용자 상태를 기준으로 탈퇴 폼을 표시합니다. 인증 Provider는 아직 미연동입니다. */
+/** 세션별 탈퇴 폼과 서버 처리 이후의 화면 정리를 관리합니다. 실제 로그인 상태는 인증 연동에서 공급해야 합니다. */
 export default function DeleteAccountPage() {
+  const router = useRouter()
   const session = useWithdrawalSession()
+  const [completion, setCompletion] = useState<'cleaning' | 'done' | 'failed' | null>(null)
+  // 계정이나 로그인 세션이 바뀌면 비밀번호, 확인 결과, 열린 모달을 함께 초기화합니다.
   const formKey = session ? JSON.stringify([session.user.id, session.sessionVersion]) : 'guest'
+
+  async function completeWithdrawal(session: WithdrawalSession) {
+    // 서버가 204를 반환한 뒤 인증 쪽에서 제공한 함수로 화면의 로그인 상태를 정리합니다.
+    setCompletion('cleaning')
+    try {
+      await session.clearAfterWithdrawal()
+      setCompletion('done')
+    } catch {
+      // 서버 탈퇴는 이미 성공했으므로 화면 정리 실패를 이유로 DELETE를 다시 요청하지 않습니다.
+      setCompletion('failed')
+    }
+  }
+
   return (
     <section className="mx-auto w-[min(92%,560px)] py-14 sm:py-20">
-      <h1 className="mb-8 text-center text-4xl font-medium tracking-[-0.06em] sm:text-5xl">회원탈퇴</h1>
-      <WithdrawalForm key={formKey} session={session} />
+      <h1 className="mb-8 text-center text-4xl font-medium tracking-[-0.06em] sm:text-5xl">
+        {completion ? '회원탈퇴 완료' : '회원탈퇴'}
+      </h1>
+      {completion ? (
+        <div className={cardClass}>
+          <p role="status">회원탈퇴가 완료되었습니다.</p>
+          {completion === 'failed' && <p role="alert">브라우저에 저장된 일부 정보를 정리하지 못했습니다.</p>}
+          <button className={primaryButton} disabled={completion === 'cleaning'} onClick={() => router.replace('/')} type="button">
+            확인
+          </button>
+        </div>
+      ) : (
+        <WithdrawalForm key={formKey} onComplete={completeWithdrawal} session={session} />
+      )}
     </section>
   )
 }
 
 /** 사전 비밀번호 확인과 최종 탈퇴를 나눠 진행하며, 확인 결과는 이 폼의 현재 비밀번호·세션에서만 사용합니다. */
-function WithdrawalForm({ session }: {
+function WithdrawalForm({ onComplete, session }: {
+  onComplete: (session: WithdrawalSession) => Promise<void>
   session: WithdrawalSession | null
 }) {
   const [password, setPassword] = useState('')
@@ -71,6 +100,7 @@ function WithdrawalForm({ session }: {
       await deleteCustomerAccount(password, request.signal)
       if (request.signal.aborted) return
       confirmation.current?.close()
+      await onComplete(session)
     } catch (error) {
       if (request.signal.aborted) return
       confirmation.current?.close()

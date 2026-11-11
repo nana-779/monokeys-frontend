@@ -7,6 +7,7 @@ import './styles.css'
 import { StoreShell } from '@/components/store-shell'
 import { CartProvider } from '@/features/cart/cart-provider'
 import { Inter } from 'next/font/google'
+import { ProductCartProvider } from '@/features/cart/components/Provider'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -57,9 +58,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </a>
         )}
         <div id="root" tabIndex={-1}>
-          <CartProvider>
-            <StoreShell>{children}</StoreShell>
-          </CartProvider>
+          <ProductCartProvider>
+            <CartProvider>
+              <StoreShell>{children}</StoreShell>
+            </CartProvider>
+          </ProductCartProvider>
         </div>
         {googleAnalyticsId && (
           <>

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { CartDrawer } from "@/features/cart/cart-drawer";
+import { Cart } from "./components/Cart"; 
 import type { CartItem } from "@/features/cart/types";
 
 type CartContextValue = {
@@ -71,15 +71,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider value={value}>
       {children}
-      <CartDrawer
-        items={items}
+      <Cart
         onClose={closeCart}
-        onSelectAll={selectAllItems}
-        onToggleSelected={toggleItemSelected}
-        onUpdateQuantity={updateQuantity}
         open={cartOpen}
-        selectedItems={selectedItems}
-        selectedKeys={selectedKeys}
       />
     </CartContext.Provider>
   );

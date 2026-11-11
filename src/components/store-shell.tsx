@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  useContext,
   useEffect,
   useState,
   type FormEvent,
@@ -12,12 +13,16 @@ import { CloseIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/common/site-header";
 import type { ApiUser } from "@/features/auth/api";
 import { useCart } from "@/features/cart/cart-provider";
+import { ProductCartContext } from "@/features/cart/components/CartContext"; 
+import { ProductType } from "@/features/cart/interface/Product"; 
 
 type AppUser = ApiUser;
 
 export function StoreShell({ children }: { children: ReactNode }) {
+  const { products } = useContext(ProductCartContext);
+  const { openCart, closeCart } = useCart();
+
   const pathname = usePathname();
-  const { items, openCart, closeCart } = useCart();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
@@ -60,10 +65,15 @@ export function StoreShell({ children }: { children: ReactNode }) {
     setAuthOpen(false);
   };
 
+  const cartCount = products.reduce(
+    (total : any, product : ProductType) => total + product.quantity,
+    0
+  );
+
   return (
     <>
       <SiteHeader
-        cartCount={items.length}
+        cartCount={cartCount}
         onOpenAccount={openAccount}
         onOpenCart={() => {
           setAuthOpen(false);

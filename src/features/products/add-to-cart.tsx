@@ -17,15 +17,13 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
 
   const handleClick = () => {
     const newProduct: ProductType = {
-      productId: String(product.id),
+      productId: product.id,
       name: product.name,
       price: unitPrice,
       stock: 0,
       quantity,
       thumbnailUrl: image ?? '',
       partType: '',
-      optionId: 0,
-      optionName: option?.value ?? '',
       additionalPrice: option?.priceAdjustment ?? 0,
       customBuildId: 0,
       buildName: '',
@@ -59,7 +57,7 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
           </button>
         </div>
         <button
-          className="h-14 flex-1 rounded-md bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800 active:scale-[0.99]"
+          className="h-14 flex-1 rounded-md bg-zinc-800 px-6 text-sm font-semibold text-white transition hover:bg-zinc-950 active:scale-[0.99]"
           onClick={handleClick}
           type="button"
         >

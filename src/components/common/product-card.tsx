@@ -17,6 +17,8 @@ export function ProductCard({ product }: { product: StoreProduct }) {
             fill
             sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 20vw"
             src={image.url}
+            unoptimized
+            priority
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-xs tracking-[0.16em] text-zinc-400">

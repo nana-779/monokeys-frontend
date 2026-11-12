@@ -2,6 +2,7 @@ import { useContext } from "react";
 import "../style.css";
 import { ProductCartContext } from "./CartContext";
 import type { ProductList, ProductType } from "../interface/Product";
+import { useRouter } from "next/navigation";
 
 type CartProps = {
   open: boolean;
@@ -9,7 +10,9 @@ type CartProps = {
 };
 
 export function Cart({ open, onClose } : CartProps) {
-    const {products} = useContext(ProductCartContext);
+    const {products, handleClearCart} = useContext(ProductCartContext);
+
+    const router = useRouter();
 
     const totalCost = products.reduce((sum : number, product : ProductType) => {
         sum += (product.price * product.quantity);
@@ -65,9 +68,17 @@ export function Cart({ open, onClose } : CartProps) {
                     <div id="Cart-Footer">
                         <div id="Total-Const-Fraim">
                             <p id="Subtotal">Subtotal</p>
-                            <p id="Total-Cost">${totalCost}</p>
+                            <p id="Total-Cost">${totalCost.toLocaleString("ko-KR")}</p>
                         </div>
-                        <button id="Cart-Payment-Button" className="bg-zinc-950 hover:bg-zinc-800 transition active:scale-[0.99]" type="button">CHECKOUT</button>
+                        <button id="Cart-Payment-Button"
+                                className={`transition-all duration-150 ${allItemCount > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
+                                type="button"
+                                disabled={allItemCount === 0}
+                                onClick={() => {
+                                    handleClearCart();
+                                    onClose();
+                                }}
+                        >CHECKOUT</button>
                     </div>
                 </aside>
             </div>
@@ -78,12 +89,10 @@ export function Cart({ open, onClose } : CartProps) {
 function NotThingItem() {
     return (
         <div id="Not-Thing-Item">
-            <div id="Bag-Icon">
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8.33301 13.3333H31.6663L29.9997 33.3333H9.99967L8.33301 13.3333Z" strokeWidth="2.5" stroke="#D4D4D8"/>
-                    <path d="M15 15V10C15 8.67392 15.5268 7.40215 16.4645 6.46447C17.4021 5.52678 18.6739 5 20 5C21.3261 5 22.5979 5.52678 23.5355 6.46447C24.4732 7.40215 25 8.67392 25 10V15" strokeWidth="2.5" stroke="#D4D4D8"/>
-                </svg>
-            </div>
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.33301 13.3333H31.6663L29.9997 33.3333H9.99967L8.33301 13.3333Z" strokeWidth="2.5" stroke="#D4D4D8"/>
+                <path d="M15 15V10C15 8.67392 15.5268 7.40215 16.4645 6.46447C17.4021 5.52678 18.6739 5 20 5C21.3261 5 22.5979 5.52678 23.5355 6.46447C24.4732 7.40215 25 8.67392 25 10V15" strokeWidth="2.5" stroke="#D4D4D8"/>
+            </svg>
             <p id="Not-Thing-Item-Message">Your cart is empty.</p>
             <p id="Not-Thing-Item-Describe">A better desk starts with one good key.</p>
         </div>
@@ -101,6 +110,7 @@ function AddListItem() {
 
 function ListItem({ product } : ProductList) {
     const {handleUpdateCount, handleRemoveProduct} = useContext(ProductCartContext);
+
     return (
         <ul id="In-Item">
             <img id="Cart-Item-Img" src={product.thumbnailUrl} />
@@ -118,7 +128,7 @@ function ListItem({ product } : ProductList) {
                 <div id="Cart-Item-Cost">
                     <div id="Cart-Count-Setting">
                         <button id="Cart-Count-Minus"
-                                className={product.quantity > 0 ? "on" : "off"}
+                                className={`${product.quantity > 1 ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
                             handleUpdateCount(product.productId, product.quantity - 1);
@@ -131,7 +141,7 @@ function ListItem({ product } : ProductList) {
                             <p id="Cart-Item-Count">{product.quantity}</p>
                         </div>
                         <button id="Cart-Count-Plus"
-                                className={product.quantity != product.stock ? "on" : "off"}
+                                className={`${product.quantity < product.stockQuantity ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
                             handleUpdateCount(product.productId, product.quantity + 1);
@@ -141,7 +151,7 @@ function ListItem({ product } : ProductList) {
                             </svg>
                         </button>
                     </div>
-                    <p id="Cart-Explain">${product.price * product.quantity}</p>
+                    <p id="Cart-Explain">${(product.price * product.quantity).toLocaleString("ko-KR")}</p>
                 </div>
             </div>
         </ ul>

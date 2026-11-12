@@ -7,7 +7,7 @@ export type StoreMedia = {
 }
 
 export type StoreProduct = {
-  id: string | number
+  id: number
   name: string
   slug: string
   basePrice: number

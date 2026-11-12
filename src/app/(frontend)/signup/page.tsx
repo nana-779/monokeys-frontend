@@ -69,7 +69,7 @@ export default function SignupPage() {
   const normalizedEmail = email.trim()
   const currentEmailCheck = emailCheck?.email === normalizedEmail ? emailCheck : null
   const available = currentEmailCheck?.available === true
-  const emailValid = emailPattern.test(normalizedEmail) && normalizedEmail.length <= 100
+  const emailValid = emailPattern.test(normalizedEmail) && normalizedEmail.length <= 50
   const disabled = pending || completed
   // 재입력 칸에서 벗어나거나 가입을 시도하면 불일치를 표시합니다.
   // 그 뒤에는 두 칸의 현재 값을 비교해 어느 쪽을 수정해도 안내를 갱신합니다.
@@ -85,7 +85,7 @@ export default function SignupPage() {
   // 이메일을 바꾸면 이전 결과를 지우고 요청을 취소해 현재 주소의 결과만 사용합니다.
   useEffect(() => {
     const addressToCheck = email.trim()
-    if (!emailPattern.test(addressToCheck) || addressToCheck.length > 100) return
+    if (!emailPattern.test(addressToCheck) || addressToCheck.length > 50) return
 
     // 이전 이메일의 응답이 나중에 도착해도 현재 입력의 중복 확인 결과를 덮어쓰지 않도록 요청마다 취소 신호를 둡니다.
     const request = new AbortController()
@@ -224,7 +224,7 @@ export default function SignupPage() {
             autoComplete="email"
             className={inputClass}
             disabled={disabled}
-            maxLength={100}
+            maxLength={50}
             name="email"
             onChange={(event) => {
               emailRequest.current?.abort()

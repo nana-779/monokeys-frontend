@@ -75,7 +75,7 @@ export function Cart({ open, onClose } : CartProps) {
                                 type="button"
                                 disabled={allItemCount === 0}
                                 onClick={() => {
-                                    handleClearCart();
+                                    router.push("/checkout");
                                     onClose();
                                 }}
                         >CHECKOUT</button>

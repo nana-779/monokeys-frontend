@@ -20,7 +20,7 @@ export default function DeleteAccountPage() {
   const formKey = session ? JSON.stringify([session.user.id, session.sessionVersion]) : 'guest'
 
   async function completeWithdrawal(session: WithdrawalSession) {
-    // 서버가 204를 반환한 뒤 인증 쪽에서 제공한 함수로 화면의 로그인 상태를 정리합니다.
+    // 서버의 200 성공 응답을 확인한 뒤 인증 쪽에서 제공한 함수로 화면의 로그인 상태를 정리합니다.
     setCompletion('cleaning')
     try {
       await session.clearAfterWithdrawal()

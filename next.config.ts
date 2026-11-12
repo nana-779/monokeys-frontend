@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
   images: {
     loader: 'custom',
     loaderFile: './figma-image-loader.ts',
+    unoptimized: true,
   },
   allowedDevOrigins,
   env: {

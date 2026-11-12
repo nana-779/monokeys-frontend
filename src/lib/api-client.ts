@@ -1,6 +1,7 @@
 // 공개 환경 변수로 Spring Boot API 주소를 설정하며, 끝의 슬래시는 제거합니다.
-// TODO: 기능별 API를 구현할 때 이 공통 요청기를 연결하세요. 현재 화면에서는 호출하지 않습니다.
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
+export const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
+).replace(/\/$/, '')
 
 // 서버 오류 응답에서 화면에 표시할 메시지를 읽을 때 사용하는 형식입니다.
 export type ApiErrorBody = { message?: string; error?: string }

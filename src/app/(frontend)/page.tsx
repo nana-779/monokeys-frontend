@@ -29,6 +29,7 @@ export default function HomePage() {
               alt={heroImage.alt || hero.name}
               className="object-cover grayscale"
               fill
+              loading="eager"
               priority
               sizes="90vw"
               src={heroImage.url}
@@ -68,8 +69,8 @@ export default function HomePage() {
         </div>
         {products.length ? (
           <div className="grid grid-cols-3 gap-7 max-lg:grid-cols-2 max-sm:grid-cols-1">
-            {products.slice(0, 3).map((product) => (
-              <ProductCard key={product.id} product={product} />
+            {products.slice(0, 3).map((product, idx) => (
+              <ProductCard key={product.id} priority={idx === 0} product={product} />
             ))}
           </div>
         ) : (

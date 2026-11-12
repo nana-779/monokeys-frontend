@@ -20,7 +20,7 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
       productId: product.id,
       name: product.name,
       price: unitPrice,
-      stock: 0,
+      stockQuantity: 0,
       quantity,
       thumbnailUrl: image ?? '',
       partType: '',

@@ -1,8 +1,7 @@
 import { useContext } from "react";
 import "../style.css";
-import { CartProductContext } from "./CartContext";
-import type { ProductList, ProductType } from "../interface/CartProduct";
-import { useRouter } from "next/navigation";
+import { ProductCartContext } from "./CartContext";
+import type { ProductList, ProductType } from "../interface/Product";
 
 type CartProps = {
   open: boolean;
@@ -10,17 +9,15 @@ type CartProps = {
 };
 
 export function Cart({ open, onClose } : CartProps) {
-    const {products, handleClearCart} = useContext(CartProductContext);
+    const {products} = useContext(ProductCartContext);
 
-    const router = useRouter();
-
-    const totalCost = products.reduce((sum : number, cartProduct : ProductType) => {
-        sum += (cartProduct.price * cartProduct.quantity);
+    const totalCost = products.reduce((sum : number, product : ProductType) => {
+        sum += (product.price * product.quantity);
         return sum;
     }, 0);
 
-    const allItemCount = products.reduce((count : number, cartProduct : ProductType) => {
-        count += cartProduct.quantity
+    const allItemCount = products.reduce((count : number, product : ProductType) => {
+        count += product.quantity
         return count
     }, 0)
 
@@ -68,17 +65,9 @@ export function Cart({ open, onClose } : CartProps) {
                     <div id="Cart-Footer">
                         <div id="Total-Const-Fraim">
                             <p id="Subtotal">Subtotal</p>
-                            <p id="Total-Cost">${totalCost.toLocaleString("ko-KR")}</p>
+                            <p id="Total-Cost">${totalCost}</p>
                         </div>
-                        <button id="Cart-Payment-Button"
-                                className={`transition-all duration-150 ${allItemCount > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
-                                type="button"
-                                disabled={allItemCount === 0}
-                                onClick={() => {
-                                    onClose();
-                                    router.push("/checkout")
-                                }}
-                        >CHECKOUT</button>
+                        <button id="Cart-Payment-Button" className="bg-zinc-950 hover:bg-zinc-800 transition active:scale-[0.99]" type="button">CHECKOUT</button>
                     </div>
                 </aside>
             </div>
@@ -89,10 +78,12 @@ export function Cart({ open, onClose } : CartProps) {
 function NotThingItem() {
     return (
         <div id="Not-Thing-Item">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8.33301 13.3333H31.6663L29.9997 33.3333H9.99967L8.33301 13.3333Z" strokeWidth="2.5" stroke="#D4D4D8"/>
-                <path d="M15 15V10C15 8.67392 15.5268 7.40215 16.4645 6.46447C17.4021 5.52678 18.6739 5 20 5C21.3261 5 22.5979 5.52678 23.5355 6.46447C24.4732 7.40215 25 8.67392 25 10V15" strokeWidth="2.5" stroke="#D4D4D8"/>
-            </svg>
+            <div id="Bag-Icon">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8.33301 13.3333H31.6663L29.9997 33.3333H9.99967L8.33301 13.3333Z" strokeWidth="2.5" stroke="#D4D4D8"/>
+                    <path d="M15 15V10C15 8.67392 15.5268 7.40215 16.4645 6.46447C17.4021 5.52678 18.6739 5 20 5C21.3261 5 22.5979 5.52678 23.5355 6.46447C24.4732 7.40215 25 8.67392 25 10V15" strokeWidth="2.5" stroke="#D4D4D8"/>
+                </svg>
+            </div>
             <p id="Not-Thing-Item-Message">Your cart is empty.</p>
             <p id="Not-Thing-Item-Describe">A better desk starts with one good key.</p>
         </div>
@@ -100,25 +91,24 @@ function NotThingItem() {
 }
 
 function AddListItem() {
-    const {products} = useContext(CartProductContext);
+    const {products} = useContext(ProductCartContext);
     return (
         <>
-            {products.map((cartProduct : ProductType) => <ListItem key={cartProduct.productId} cartProduct={cartProduct} />)}
+            {products.map((product : ProductType) => <ListItem key={product.productId} product={product} />)}
         </>
     )
 }
 
-function ListItem({ cartProduct } : ProductList) {
-    const {handleUpdateCount, handleRemoveProduct} = useContext(CartProductContext);
-
+function ListItem({ product } : ProductList) {
+    const {handleUpdateCount, handleRemoveProduct} = useContext(ProductCartContext);
     return (
         <ul id="In-Item">
-            <img id="Cart-Item-Img" src={cartProduct.thumbnailUrl} />
+            <img id="Cart-Item-Img" src={product.thumbnailUrl} />
             <div id="Cart-Item-Distance">
                 <div id="Cart-Item-Main">
-                    <p id="Cart-Item-Name">{cartProduct.name}</p>
+                    <p id="Cart-Item-Name">{product.name}</p>
                     <button id="Cart-Item-Remove-Button" type="button" tabIndex={-1} onClick={() => {
-                        handleRemoveProduct(cartProduct.productId)
+                        handleRemoveProduct(product.productId)
                     }}>
                         <svg id="Cart-Item-Remove_Icon" width="18" height="20" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M16 5L15.1327 17.1425C15.0579 18.1891 14.187 19 13.1378 19H4.86224C3.81296 19 2.94208 18.1891 2.86732 17.1425L2 5M16 5H12M16 5H17M2 5H1M2 5H6M7 9V15M11 9V15M12 5V2C12 1.44772 11.5523 1 11 1H7C6.44772 1 6 1.44772 6 2V5M12 5H6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="#000000"/>
@@ -128,30 +118,30 @@ function ListItem({ cartProduct } : ProductList) {
                 <div id="Cart-Item-Cost">
                     <div id="Cart-Count-Setting">
                         <button id="Cart-Count-Minus"
-                                className={`${cartProduct.quantity > 1 ? "on" : "off"}`}
+                                className={product.quantity > 0 ? "on" : "off"}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
-                            handleUpdateCount(cartProduct.productId, cartProduct.quantity - 1);
+                            handleUpdateCount(product.productId, product.quantity - 1);
                         }}>
                             <svg width="10" height="1" viewBox="0 0 10 1" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 0.5H9.33333" stroke="currentColor"/>
                             </svg>
                         </button>
                         <div id="Cart-Item-Count-Frame">
-                            <p id="Cart-Item-Count">{cartProduct.quantity}</p>
+                            <p id="Cart-Item-Count">{product.quantity}</p>
                         </div>
                         <button id="Cart-Count-Plus"
-                                className={`${cartProduct.quantity < cartProduct.stockQuantity ? "on" : "off"}`}
+                                className={product.quantity != product.stock ? "on" : "off"}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
-                            handleUpdateCount(cartProduct.productId, cartProduct.quantity + 1);
+                            handleUpdateCount(product.productId, product.quantity + 1);
                         }}>
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"     xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 4.66667H4.66667M4.66667 4.66667H9.33333M4.66667 4.66667V0M4.66667 4.66667V9.33333" stroke="currentColor"/>
                             </svg>
                         </button>
                     </div>
-                    <p id="Cart-Explain">${(cartProduct.price * cartProduct.quantity).toLocaleString("ko-KR")}</p>
+                    <p id="Cart-Explain">${product.price * product.quantity}</p>
                 </div>
             </div>
         </ ul>

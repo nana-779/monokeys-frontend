@@ -3,7 +3,7 @@ import type { StoreProduct } from '@/lib/store-shared'
 /** Presentation-only fixtures used when the Spring API is offline in development. */
 export const demoProducts: StoreProduct[] = [
   {
-    id: 0,
+    id: 'demo-slate-65',
     name: 'Slate 65',
     slug: 'slate-65',
     basePrice: 189,
@@ -24,7 +24,7 @@ export const demoProducts: StoreProduct[] = [
     }],
   },
   {
-    id: 1,
+    id: 'demo-arc-tkl',
     name: 'Arc TKL',
     slug: 'arc-tkl',
     basePrice: 229,
@@ -45,7 +45,7 @@ export const demoProducts: StoreProduct[] = [
     }],
   },
   {
-    id: 2,
+    id: 'demo-ivory-air',
     name: 'Ivory Air',
     slug: 'ivory-air',
     basePrice: 149,

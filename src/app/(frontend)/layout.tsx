@@ -7,7 +7,7 @@ import './styles.css'
 import { StoreShell } from '@/components/store-shell'
 import { CartProvider } from '@/features/cart/cart-provider'
 import { Inter } from 'next/font/google'
-import { CartProductProvider } from '@/features/cart/components/Provider'
+import { ProductCartProvider } from '@/features/cart/components/Provider'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const customScripts = makeSiteSettings.customScripts
 
   return (
-    <html lang={language} data-scroll-behavior="smooth">
+    <html lang={language}>
       <head>
         {renderHeadCustomCode(customScripts?.headStart, 'head-start')}
         {renderHeadCustomCode(customScripts?.headEnd, 'head-end')}
@@ -58,11 +58,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </a>
         )}
         <div id="root" tabIndex={-1}>
-          <CartProductProvider>
+          <ProductCartProvider>
             <CartProvider>
               <StoreShell>{children}</StoreShell>
             </CartProvider>
-          </CartProductProvider>
+          </ProductCartProvider>
         </div>
         {googleAnalyticsId && (
           <>

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ProductType } from "../interface/CartProduct";
-import { CartProductContext } from "./CartContext";
+import { ProductType } from "../interface/Product";
+import { ProductCartContext } from "./CartContext";
 
-export function CartProductProvider({ children }: { children: ReactNode}) {
+export function ProductCartProvider({ children }: { children: ReactNode}) {
   const [products, setProducts] = useState<ProductType[]>([]);
 
   const isLoaded = useRef(false);
@@ -22,16 +22,16 @@ export function CartProductProvider({ children }: { children: ReactNode}) {
     localStorage.setItem("cartProduct", JSON.stringify(products));
   }, [products]);
 
-  function handleUpdateCount(id : number, newQuantity : number) {
+  function handleUpdateCount(id : string, newQuantity : number) {
     setProducts((prevProducts : ProductType[]) => prevProducts.map((product : ProductType) => {
       if (product.productId === id) {
         const targetProduct = products.find((product : ProductType) => product.productId === id);
 
-        newQuantity = Math.max(1, newQuantity);
+        newQuantity = Math.max(0, newQuantity);
 
-        if (targetProduct && newQuantity > targetProduct.stockQuantity) {
-          alert(`${targetProduct.name}의 현재 재고수는 ${targetProduct.stockQuantity}개입니다.`);
-          newQuantity = targetProduct.stockQuantity;
+        if (targetProduct && newQuantity > targetProduct.stock) {
+          alert(`${targetProduct.name}의 현재 재고수는 ${targetProduct.stock}개입니다.`);
+          newQuantity = targetProduct.stock;
         }
         
         return { ...product, quantity : newQuantity};
@@ -40,7 +40,7 @@ export function CartProductProvider({ children }: { children: ReactNode}) {
     })
   );}
 
-  function handleRemoveProduct(id : number) {
+  function handleRemoveProduct(id : string) {
     setProducts((prevProducts : ProductType[]) =>
       prevProducts.filter((product : ProductType) => product.productId !== id)
     );
@@ -50,33 +50,33 @@ export function CartProductProvider({ children }: { children: ReactNode}) {
       const existingProduct = products.find(
           (product) =>
               product.productId === newProduct.productId &&
+              product.optionId === newProduct.optionId &&
               product.customBuildId === newProduct.customBuildId &&
-              product.includeAssembly === newProduct.includeAssembly &&
-              product.stockQuantity === newProduct.stockQuantity
+              product.includeAssembly === newProduct.includeAssembly
       );
 
       if (existingProduct) {
           const newQuantity =
               existingProduct.quantity + newProduct.quantity;
 
-          if (newQuantity > existingProduct.stockQuantity) {
+          if (newQuantity > existingProduct.stock) {
               alert(
-                  `${existingProduct.name}의 현재 재고수는 ${existingProduct.stockQuantity}개입니다.`
+                  `${existingProduct.name}의 현재 재고수는 ${existingProduct.stock}개입니다.`
               );
           }
 
           const finalQuantity = Math.min(
               newQuantity,
-              existingProduct.stockQuantity
+              existingProduct.stock
           );
 
           setProducts((prevProducts) =>
               prevProducts.map((product) => {
                   if (
                       product.productId === newProduct.productId &&
+                      product.optionId === newProduct.optionId &&
                       product.customBuildId === newProduct.customBuildId &&
-                      product.includeAssembly === newProduct.includeAssembly &&
-                      product.stockQuantity === newProduct.stockQuantity
+                      product.includeAssembly === newProduct.includeAssembly
                   ) {
                       return {
                           ...product,
@@ -90,19 +90,20 @@ export function CartProductProvider({ children }: { children: ReactNode}) {
 
           return;
       }
+
+      const newStock = Math.max(2, Math.floor(Math.random() * 20));
       setProducts((prevProducts) => [
           ...prevProducts,
-          newProduct
+          {
+              ...newProduct,
+              stock: Math.max(newProduct.quantity, newStock)
+          },
       ]);
   }
 
-  function handleClearCart() {
-    setProducts([]);
-  }
-
   return (
-    <CartProductContext.Provider value={{products, handleUpdateCount, handleRemoveProduct, handleAddProduct, handleClearCart}}>
+    <ProductCartContext.Provider value={{products, handleUpdateCount, handleRemoveProduct, handleAddProduct}}>
       {children}  
-    </CartProductContext.Provider>
+    </ProductCartContext.Provider>
   );
 }

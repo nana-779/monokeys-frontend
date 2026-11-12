@@ -75,7 +75,7 @@
     height: 38px;
 
     background-color: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid #000000;
     border-radius: 3.35544e+07px;
 
     /* 내부 오토레이아웃 */
@@ -85,12 +85,10 @@
 
 #Cart-Close-Button:hover {
   background-color: #DDDDDD;
-  border: 1px solid #AAAAAA;
 }
 
 #Cart-Close-Button:active  {
     background-color: #AAAAAA;
-    border: 1px solid #888888;
 }
 
 #Cart-Body {
@@ -133,6 +131,24 @@
     flex: none;
     order: 0;
     align-self: stretch;
+}
+
+#Bag-Icon {
+    /* BagIcon:margin */
+
+    /* 오토레이아웃 */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px 0px 0px;
+
+    width: 40px;
+    height: 60px;
+
+
+    /* 내부 오토레이아웃 */
+    flex: none;
+    order: 0;
 }
 
 #Not-Thing-Item-Message {
@@ -624,10 +640,4 @@
     /* 상자 높이와 동일 또는 143% */
 
     color: #FFFFFF;
-}
-
-#Cart-Payment-Button.off {
-    background-color: #CCCCCC;
-    color: #FFFFFF;
-    cursor: not-allowed;
 }

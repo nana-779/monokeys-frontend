@@ -13,13 +13,13 @@ import { CloseIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/common/site-header";
 import type { ApiUser } from "@/features/auth/api";
 import { useCart } from "@/features/cart/cart-provider";
-import { CartProductContext } from "@/features/cart/components/CartContext"; 
-import { ProductType } from "@/features/cart/interface/CartProduct"; 
+import { ProductCartContext } from "@/features/cart/components/CartContext"; 
+import { ProductType } from "@/features/cart/interface/Product"; 
 
 type AppUser = ApiUser;
 
 export function StoreShell({ children }: { children: ReactNode }) {
-  const { products } = useContext(CartProductContext);
+  const { products } = useContext(ProductCartContext);
   const { openCart, closeCart } = useCart();
 
   const pathname = usePathname();

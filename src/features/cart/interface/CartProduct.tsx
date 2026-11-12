@@ -1,13 +1,11 @@
 export interface ProductType {
-    productId : string,         // Id
+    productId : number,         // Id
     name : string,              // 이름
     price : number,             // 기본 단가
-    stock : number,             // 재고수
+    stockQuantity : number,             // 재고수
     quantity : number,          // 담은 수량
-    thumbnailUrl : string,      // 이미지 주소
+    thumbnailUrl : string | undefined,      // 이미지 주소
     partType : string,          // 카테고리 분류
-    optionId : number,          // 옵션 ID
-    optionName : string,        // 옵션명
     additionalPrice : number,   // 옵션 추가 금액
     customBuildId : number,     // 커스텀 키보드 세트 ID
     buildName : string,         // 완제품 이름
@@ -15,5 +13,5 @@ export interface ProductType {
 }
 
 export interface ProductList {
-    product : ProductType;
+    cartProduct : ProductType;
 }

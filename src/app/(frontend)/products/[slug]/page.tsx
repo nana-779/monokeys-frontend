@@ -24,6 +24,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 priority
                 sizes="(max-width: 1024px) 92vw, 50vw"
                 src={primaryImage.url}
+                unoptimized
               />
             )}
           </div>

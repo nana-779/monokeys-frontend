@@ -4,12 +4,12 @@ import { useContext, useState } from 'react'
 import { MinusIcon, PlusIcon } from '@/components/icons'
 import { useCart } from '@/features/cart/cart-provider'
 import { formatPrice, type StoreProduct } from '@/lib/store-shared'
-import { ProductCartContext } from '../cart/components/CartContext' 
-import { ProductType } from '../cart/interface/Product' 
+import { CartProductContext } from '../cart/components/CartContext' 
+import { ProductType } from '../cart/interface/CartProduct' 
 
 export function AddToCart({ product, image }: { product: StoreProduct; image?: string }) {
   const { openCart } = useCart()
-  const { handleAddProduct } = useContext(ProductCartContext);
+  const { handleAddProduct } = useContext(CartProductContext);
   const [quantity, setQuantity] = useState(1)
   const option = product.options?.[0]
   const optionValue = option?.value ?? ''
@@ -17,15 +17,13 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
 
   const handleClick = () => {
     const newProduct: ProductType = {
-      productId: String(product.id),
+      productId: product.id,
       name: product.name,
       price: unitPrice,
-      stock: 0,
+      stockQuantity: product.stockQuantity,
       quantity,
       thumbnailUrl: image ?? '',
       partType: '',
-      optionId: 0,
-      optionName: option?.value ?? '',
       additionalPrice: option?.priceAdjustment ?? 0,
       customBuildId: 0,
       buildName: '',
@@ -59,7 +57,7 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
           </button>
         </div>
         <button
-          className="h-14 flex-1 rounded-md bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800 active:scale-[0.99]"
+          className="h-14 flex-1 rounded-md bg-zinc-800 px-6 text-sm font-semibold text-white transition hover:bg-zinc-950 active:scale-[0.99]"
           onClick={handleClick}
           type="button"
         >

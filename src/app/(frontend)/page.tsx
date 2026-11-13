@@ -1,9 +1,11 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowIcon } from '@/components/icons'
 import { ProductCard } from '@/components/common/product-card'
+import { ProductImage } from '@/components/common/product-image'
 import { mediaFrom } from '@/lib/store-shared'
 import { getPreviewProducts } from '@/features/products/preview-data'
+import { getProducts } from '@/features/products/api'
+import type { StoreProduct } from '@/lib/store-shared'
 
 const categoryCards = [
   {
@@ -15,8 +17,13 @@ const categoryCards = [
   { label: 'KEYCAPS', detail: 'A new texture for every key', href: '/products?category=keycaps' },
 ]
 
-export default function HomePage() {
-  const products = getPreviewProducts()
+export default async function HomePage() {
+  let products: StoreProduct[]
+  try {
+    products = await getProducts()
+  } catch {
+    products = getPreviewProducts()
+  }
   const hero = products[0]
   const heroImage = hero ? mediaFrom(hero.images[0]) : null
 
@@ -24,16 +31,11 @@ export default function HomePage() {
     <>
       <section className="mx-auto w-[min(80%,1440px)] py-8 max-lg:w-[92%]">
         <div className="relative min-h-[620px] overflow-hidden rounded-xl bg-zinc-100 max-md:min-h-[520px]">
-          {heroImage?.url && (
-            <Image
-              alt={heroImage.alt || hero.name}
-              className="object-cover grayscale"
-              fill
-              priority
-              sizes="90vw"
-              src={heroImage.url}
-            />
-          )}
+          <ProductImage
+            alt={heroImage?.alt || hero?.name || '상품 이미지'}
+            className="absolute inset-0 h-full w-full object-cover grayscale"
+            src={heroImage?.url}
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/25 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-12 text-white max-md:p-7">
             <p className="mb-5 text-xs font-semibold tracking-[0.2em]">DESIGNED FOR THE DESK</p>

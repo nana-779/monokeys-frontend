@@ -1,8 +1,14 @@
 import { ProductGrid } from '@/features/products/product-grid'
-import { getPreviewProducts } from '@/features/products/preview-data'
+import { getProducts } from '@/features/products/api'
+import type { StoreProduct } from '@/lib/store-shared'
 
-export default function ProductsPage() {
-  const products = getPreviewProducts()
+export default async function ProductsPage() {
+  let products: StoreProduct[] = []
+  try {
+    products = await getProducts()
+  } catch {
+    // 백엔드가 실행 중이지 않아도 카탈로그 화면은 열리도록 빈 목록을 표시합니다.
+  }
 
   return (
     <section className="mx-auto w-[min(80%,1440px)] py-20 max-lg:w-[92%]">

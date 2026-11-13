@@ -1,7 +1,10 @@
 import { useRef, useState, type FormEvent } from "react";
+import { createAdminProduct } from "@/features/admin/api";
+import type { AdminProductInput } from "@/features/admin/api";
 
 type View = "register" | "list" | "edit";
 type DialogType = "delete-all" | "delete-selected" | null;
+type CategoryValue = "" | "housing" | "keyboards" | "switches" | "keycaps";
 type IconName =
   | "box"
   | "plus"
@@ -19,11 +22,11 @@ type IconName =
   | "alert"
   | "menu";
 
-const categories = [
-  { label: "키보드", value: "keyboards" },
+const categories: { label: string; value: Exclude<CategoryValue, ""> }[] = [
+  { label: "하우징", value: "housing" },
+  { label: "기판", value: "keyboards" },
   { label: "스위치", value: "switches" },
   { label: "키캡", value: "keycaps" },
-  { label: "하우징", value: "housing" },
 ];
 
 const inputClass =
@@ -195,24 +198,41 @@ function ProductForm({
   onCancel: () => void;
   onComplete: (message: string) => void;
 }) {
-  const [images, setImages] = useState<{ name: string; url: string }[]>([]);
-  const [options, setOptions] = useState([
-    { id: crypto.randomUUID(), name: "", value: "" },
-  ]);
+  const [images, setImages] = useState<{ name: string; url: string; file: File }[]>([]);
   const [price, setPrice] = useState("");
-  const [shipping, setShipping] = useState("");
-  const [status, setStatus] = useState<"sale" | "suspended">("sale");
+  const [selectedCategory, setSelectedCategory] = useState<CategoryValue>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [spec, setSpec] = useState({
+    layout: null as string | null,
+    housingMaterial: null as string | null,
+    supportPins: null as string | null,
+    isWireless: null as boolean | null,
+    switchPin: null as string | null,
+    switchType: null as string | null,
+    keycapMaterial: null as string | null,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleImages = (files: FileList | null) => {
-    if (!files) return;
-    setImages((current) => [
-      ...current,
-      ...Array.from(files).map((file) => ({
-        name: file.name,
-        url: URL.createObjectURL(file),
-      })),
-    ]);
+    const file = files?.[0];
+    if (!file) return;
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      !/\.(jpe?g|png|webp)$/i.test(file.name)
+    ) {
+      setError("JPG, JPEG, PNG, WEBP 이미지 파일만 선택할 수 있습니다.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("이미지 용량은 5MB 이하만 업로드할 수 있습니다.");
+      return;
+    }
+    setError("");
+    setImages((current) => {
+      current.forEach((image) => URL.revokeObjectURL(image.url));
+      return [{ name: file.name, url: URL.createObjectURL(file), file }];
+    });
   };
 
   const removeImage = (index: number) => {
@@ -225,13 +245,83 @@ function ProductForm({
   const formatNumber = (value: string) =>
     value.replace(/[^\d]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onComplete(
-      mode === "edit"
-        ? "변경 내용은 상품 API 연동 후 저장할 수 있습니다."
-        : "상품 정보는 API 연동 후 저장할 수 있습니다.",
+    if (mode === "edit") {
+      setError("상품 수정 API는 아직 연결되지 않았습니다.");
+      return;
+    }
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const categoryValue = String(formData.get("categoryName") ?? "");
+    const categoryName = categories.find(
+      (category) => category.value === categoryValue,
+    )?.label;
+    const name = String(formData.get("name") ?? "").trim();
+    const basePrice = Number(
+      String(formData.get("basePrice") ?? "").replaceAll(",", ""),
     );
+    const stockQuantity = Number(formData.get("stockQuantity"));
+    const description =
+      String(formData.get("description") ?? "").trim() || null;
+
+    if (
+      !categoryName ||
+      !name ||
+      !Number.isInteger(basePrice) ||
+      basePrice <= 0 ||
+      !Number.isInteger(stockQuantity) ||
+      stockQuantity < 0
+    ) {
+      setError("상품명, 카테고리, 가격, 재고를 확인해 주세요.");
+      return;
+    }
+
+    const input: AdminProductInput = {
+      categoryName,
+      name,
+      basePrice,
+      stockQuantity,
+      thumbnailUrl: null,
+      description,
+      layout: spec.layout,
+      housingMaterial: spec.housingMaterial,
+      supportPins: spec.supportPins,
+      isWireless: spec.isWireless,
+      switchPin: spec.switchPin ? Number(spec.switchPin) : null,
+      switchType: spec.switchType,
+      keycapMaterial: spec.keycapMaterial,
+    };
+
+    setError("");
+    setSubmitting(true);
+    try {
+      const productId = await createAdminProduct(input, images[0]?.file);
+      onComplete(`상품이 정상적으로 등록되었습니다. 상품 번호: ${productId}`);
+      form.reset();
+      setPrice("");
+      setSelectedCategory("");
+      setSpec({
+        layout: null,
+        housingMaterial: null,
+        supportPins: null,
+        isWireless: null,
+        switchPin: null,
+        switchType: null,
+        keycapMaterial: null,
+      });
+      images.forEach((image) => URL.revokeObjectURL(image.url));
+      setImages([]);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "상품을 등록할 수 없습니다.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -239,13 +329,14 @@ function ProductForm({
       <FormSection
         number="01"
         title="기본 정보"
-        description="고객에게 표시할 상품의 기본 정보를 입력해 주세요."
+        description="상품의 기본 정보를 입력해주세요"
       >
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
             <Field label="상품명" required>
               <input
                 className={inputClass}
+                name="name"
                 placeholder="상품명을 입력해 주세요"
                 required
               />
@@ -255,7 +346,21 @@ function ProductForm({
             <div className="relative">
               <select
                 className={`${inputClass} appearance-none pr-10`}
-                defaultValue=""
+                value={selectedCategory}
+                name="categoryName"
+                onChange={(event) => {
+                  const nextCategory = event.target.value as CategoryValue;
+                  setSelectedCategory(nextCategory);
+                  setSpec({
+                    layout: null,
+                    housingMaterial: null,
+                    supportPins: null,
+                    isWireless: nextCategory === "keyboards" ? false : null,
+                    switchPin: null,
+                    switchType: null,
+                    keycapMaterial: null,
+                  });
+                }}
                 required
               >
                 <option value="" disabled>
@@ -272,17 +377,12 @@ function ProductForm({
               </span>
             </div>
           </Field>
-          <Field label="브랜드 / 제조사">
-            <input
-              className={inputClass}
-              placeholder="브랜드 또는 제조사를 입력해 주세요"
-            />
-          </Field>
           <div className="md:col-span-2">
-            <Field label="상품 설명" hint="권장 입력 분량: 200~1,500자">
+            <Field label="상품 설명" hint="200~1500자 사이로 입력해주세요">
               <textarea
                 className={`${inputClass} min-h-32 resize-y py-3`}
-                placeholder="상품의 주요 특징, 소재 등 필요한 정보를 입력해 주세요"
+                name="description"
+                placeholder="상품 설명을 입력해 주세요"
               />
             </Field>
           </div>
@@ -291,8 +391,160 @@ function ProductForm({
 
       <FormSection
         number="02"
+        title="부품 상세 정보"
+        description="선택한 카테고리에 맞는 규격과 소재를 입력해 주세요."
+      >
+        {!selectedCategory ? (
+          <p className="text-sm text-zinc-400">
+            먼저 기본 정보에서 상품 카테고리를 선택해 주세요.
+          </p>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2">
+            {(selectedCategory === "housing" || selectedCategory === "keyboards") && (
+              <Field label="배열 규격">
+                <select
+                  className={inputClass}
+                  value={spec.layout ?? ""}
+                  onChange={(event) =>
+                    setSpec((current) => ({
+                      ...current,
+                      layout: event.target.value || null,
+                    }))
+                  }
+                >
+                  <option value="">선택 안 함</option>
+                  <option value="87">87</option>
+                  <option value="75">75</option>
+                  <option value="65">65</option>
+                </select>
+              </Field>
+            )}
+
+            {selectedCategory === "housing" && (
+              <Field label="하우징 소재">
+                <select
+                  className={inputClass}
+                  value={spec.housingMaterial ?? ""}
+                  onChange={(event) =>
+                    setSpec((current) => ({
+                      ...current,
+                      housingMaterial: event.target.value || null,
+                    }))
+                  }
+                >
+                  <option value="">선택 안 함</option>
+                  <option value="알루미늄">알루미늄</option>
+                  <option value="아크릴">아크릴</option>
+                  <option value="폴리카보네이트">폴리카보네이트</option>
+                  <option value="목재">목재</option>
+                  <option value="플라스틱">플라스틱</option>
+                </select>
+              </Field>
+            )}
+
+            {selectedCategory === "keyboards" && (
+              <>
+                <Field label="기판 지원 핀 규격">
+                  <select
+                    className={inputClass}
+                    value={spec.supportPins ?? ""}
+                    onChange={(event) =>
+                      setSpec((current) => ({
+                        ...current,
+                        supportPins: event.target.value || null,
+                      }))
+                    }
+                  >
+                    <option value="">선택 안 함</option>
+                    <option value="3">3핀</option>
+                    <option value="5">5핀</option>
+                  </select>
+                </Field>
+                <Field label="무선 지원">
+                  <label className="flex h-11 items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      checked={spec.isWireless === true}
+                      className="h-4 w-4 accent-zinc-900"
+                      onChange={(event) =>
+                        setSpec((current) => ({
+                          ...current,
+                          isWireless: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    무선 지원
+                  </label>
+                </Field>
+              </>
+            )}
+
+            {selectedCategory === "switches" && (
+              <>
+                <Field label="스위치 핀 수">
+                  <select
+                    className={inputClass}
+                    value={spec.switchPin ?? ""}
+                    onChange={(event) =>
+                      setSpec((current) => ({
+                        ...current,
+                        switchPin: event.target.value || null,
+                      }))
+                    }
+                  >
+                    <option value="">선택 안 함</option>
+                    <option value="3">3핀</option>
+                    <option value="5">5핀</option>
+                  </select>
+                </Field>
+                <Field label="스위치 분류">
+                  <select
+                    className={inputClass}
+                    value={spec.switchType ?? ""}
+                    onChange={(event) =>
+                      setSpec((current) => ({
+                        ...current,
+                        switchType: event.target.value || null,
+                      }))
+                    }
+                  >
+                    <option value="">선택 안 함</option>
+                    <option value="linear">리니어</option>
+                    <option value="tactile">택타일</option>
+                    <option value="click">클릭</option>
+                    <option value="silent">저소음</option>
+                  </select>
+                </Field>
+              </>
+            )}
+
+            {selectedCategory === "keycaps" && (
+              <Field label="키캡 소재">
+                <select
+                  className={inputClass}
+                  value={spec.keycapMaterial ?? ""}
+                  onChange={(event) =>
+                    setSpec((current) => ({
+                      ...current,
+                      keycapMaterial: event.target.value || null,
+                    }))
+                  }
+                >
+                  <option value="">선택 안 함</option>
+                  <option value="PBT">PBT</option>
+                  <option value="ABS">ABS</option>
+                  <option value="POM">POM</option>
+                </select>
+              </Field>
+            )}
+          </div>
+        )}
+      </FormSection>
+
+      <FormSection
+        number="03"
         title="가격 및 재고"
-        description="판매 가격, 재고, 배송 정보를 설정해 주세요."
+        description="판매 가격과 재고 수량을 입력해 주세요."
       >
         <div className="grid gap-5 md:grid-cols-2">
           <Field label="판매 가격" required>
@@ -303,6 +555,7 @@ function ProductForm({
               <input
                 className={`${inputClass} pl-8`}
                 inputMode="numeric"
+                name="basePrice"
                 placeholder="0"
                 required
                 value={price}
@@ -318,47 +571,25 @@ function ProductForm({
             <input
               className={inputClass}
               min="0"
+              name="stockQuantity"
               placeholder="0"
               required
               type="number"
-            />
-          </Field>
-          <Field label="배송비" hint="무료 배송은 0을 입력해 주세요.">
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-500">
-                ₩
-              </span>
-              <input
-                className={`${inputClass} pl-8`}
-                inputMode="numeric"
-                placeholder="0"
-                value={shipping}
-                onChange={(event) =>
-                  setShipping(formatNumber(event.target.value))
-                }
-              />
-            </div>
-          </Field>
-          <Field label="KC 인증번호">
-            <input
-              className={inputClass}
-              placeholder="인증번호를 입력해 주세요"
             />
           </Field>
         </div>
       </FormSection>
 
       <FormSection
-        number="03"
+        number="04"
         title="상품 이미지"
-        description="상품을 잘 보여주는 이미지를 등록해 주세요."
+        description="대표 이미지 파일을 선택하면 서버에 업로드되어 상품 썸네일로 저장됩니다."
       >
         <input
           ref={inputRef}
           className="hidden"
           type="file"
-          accept="image/*"
-          multiple
+          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
           onChange={(event) => handleImages(event.target.files)}
         />
         <button
@@ -381,7 +612,7 @@ function ProductForm({
             </span>
           </span>
           <span className="mt-1.5 text-xs text-zinc-400">
-            PNG, JPG, WEBP · 여러 파일 선택 가능
+            JPG, PNG, WEBP · 최대 5MB · 대표 썸네일 이미지 1개
           </span>
         </button>
         {images.length > 0 && (
@@ -410,132 +641,12 @@ function ProductForm({
         )}
       </FormSection>
 
-      <FormSection
-        number="04"
-        title="상품 옵션"
-        description="색상, 크기, 배열 등 상품 옵션을 추가해 주세요."
-      >
-        <div className="space-y-3">
-          {options.map((option, index) => (
-            <div key={option.id} className="flex items-end gap-3">
-              <div className="grid flex-1 gap-3 sm:grid-cols-2">
-                <Field label={index === 0 ? "옵션명" : `옵션 ${index + 1}`}>
-                  <input
-                    className={inputClass}
-                    placeholder="예: 스위치 종류"
-                    value={option.name}
-                    onChange={(event) =>
-                      setOptions((current) =>
-                        current.map((item) =>
-                          item.id === option.id
-                            ? { ...item, name: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-                <Field label={index === 0 ? "옵션 값" : "옵션 값"}>
-                  <input
-                    className={inputClass}
-                    placeholder="예: 리니어, 택타일"
-                    value={option.value}
-                    onChange={(event) =>
-                      setOptions((current) =>
-                        current.map((item) =>
-                          item.id === option.id
-                            ? { ...item, value: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-              </div>
-              <button
-                aria-label={`옵션 ${index + 1} 삭제`}
-                className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35"
-                type="button"
-                disabled={options.length === 1}
-                onClick={() =>
-                  setOptions((current) =>
-                    current.filter((item) => item.id !== option.id),
-                  )
-                }
-              >
-                <Icon name="trash" size={17} />
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-200 px-3.5 text-sm font-semibold text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-950"
-          type="button"
-          onClick={() =>
-            setOptions((current) => [
-              ...current,
-              { id: crypto.randomUUID(), name: "", value: "" },
-            ])
-          }
-        >
-          <Icon name="plus" size={16} />
-          옵션 추가
-        </button>
-      </FormSection>
-
-      <FormSection
-        number="05"
-        title="판매 상태"
-        description="상품의 판매 여부를 선택해 주세요."
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              value: "sale",
-              title: "판매 중",
-              detail: "상품 노출 및 구매 가능",
-            },
-            {
-              value: "suspended",
-              title: "판매 중지",
-              detail: "상품 비노출 및 구매 불가",
-            },
-          ].map((item) => (
-            <button
-              key={item.value}
-              className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${
-                status === item.value
-                  ? "border-zinc-800 bg-zinc-100/60 ring-3 ring-zinc-800/8"
-                  : "border-zinc-200 hover:border-zinc-300"
-              }`}
-              type="button"
-              onClick={() => setStatus(item.value as "sale" | "suspended")}
-            >
-              <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                  status === item.value
-                    ? "border-zinc-900 bg-zinc-900 text-white"
-                    : "border-zinc-300"
-                }`}
-              >
-                {status === item.value && (
-                  <Icon name="check" size={12} strokeWidth={2.5} />
-                )}
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-zinc-800">
-                  {item.title}
-                </span>
-                <span className="mt-0.5 block text-xs text-zinc-400">
-                  {item.detail}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </FormSection>
-
       <div className="flex items-center justify-end gap-3 border-t border-zinc-200 pt-6">
+        {error && (
+          <p className="mr-auto text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
         {mode === "edit" && (
           <button
             className="h-11 rounded-lg border border-zinc-200 bg-white px-5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50"
@@ -547,10 +658,15 @@ function ProductForm({
         )}
         <button
           className="inline-flex h-11 items-center gap-2 rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(0,0,0,0.1)] transition hover:bg-zinc-950 active:translate-y-px"
+          disabled={submitting}
           type="submit"
         >
           <Icon name="check" size={17} />
-          {mode === "edit" ? "변경 사항 저장" : "상품 등록"}
+          {submitting
+            ? "등록 중..."
+            : mode === "edit"
+              ? "변경 사항 저장"
+              : "상품 등록"}
         </button>
       </div>
     </form>
@@ -778,7 +894,7 @@ export default function AdminDashboard({
 }: {
   previewMode?: boolean;
 }) {
-  // TODO(담당 5): 현재 버튼과 폼은 화면 미리보기입니다. 기능별 API를 연결하세요.
+  // TODO(담당 5): 상품 목록, 수정, 삭제 API와 관리자 권한 확인을 연결합니다.
   const [view, setView] = useState<View>("register");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogType>(null);

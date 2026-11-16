@@ -1,9 +1,10 @@
-import type { StoreProduct } from '@/lib/store-shared'
+import { resolveProductCategory, type StoreProduct } from '@/lib/store-shared'
 import { API_BASE_URL } from '@/lib/api-client'
 
 type ProductResponse = {
   productId: number
   categoryName: string
+  categoryId?: string
   name: string
   basePrice: number
   stockQuantity: number
@@ -15,10 +16,7 @@ type ProductResponse = {
 type ApiResponse<T> = { success: boolean; message: string | null; data: T | null }
 
 function toStoreProduct(item: ProductResponse): StoreProduct {
-  const category = ({
-    '하우징': 'housing', '기판': 'keyboards', '스위치': 'switches', '키캡': 'keycaps',
-    housing: 'housing', pcb: 'keyboards', keyboards: 'keyboards', switches: 'switches', keycaps: 'keycaps',
-  } as Record<string, StoreProduct['category']>)[item.categoryName] ?? 'housing'
+  const category = resolveProductCategory(item.categoryId, item.categoryName)
 
   return {
     id: item.productId,

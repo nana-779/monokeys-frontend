@@ -198,7 +198,9 @@ function ProductForm({
   onCancel: () => void;
   onComplete: (message: string) => void;
 }) {
-  const [images, setImages] = useState<{ name: string; url: string; file: File }[]>([]);
+  const [images, setImages] = useState<
+    { name: string; url: string; file: File }[]
+  >([]);
   const [price, setPrice] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<CategoryValue>("");
   const [submitting, setSubmitting] = useState(false);
@@ -378,8 +380,9 @@ function ProductForm({
             </div>
           </Field>
           <div className="md:col-span-2">
-            <Field label="상품 설명" hint="200~1500자 사이로 입력해주세요">
+            <Field label="상품 설명" hint="300자 이내로 입력해주세요">
               <textarea
+                maxLength={300}
                 className={`${inputClass} min-h-32 resize-y py-3`}
                 name="description"
                 placeholder="상품 설명을 입력해 주세요"
@@ -400,7 +403,8 @@ function ProductForm({
           </p>
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {(selectedCategory === "housing" || selectedCategory === "keyboards") && (
+            {(selectedCategory === "housing" ||
+              selectedCategory === "keyboards") && (
               <Field label="배열 규격">
                 <select
                   className={inputClass}

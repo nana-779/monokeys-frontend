@@ -1,4 +1,4 @@
-import type { StoreProduct } from "@/lib/store-shared";
+import { resolveProductCategory, type StoreProduct } from "@/lib/store-shared";
 import { API_BASE_URL } from "@/lib/api-client";
 
 // TODO(담당 5): 관리자 상품 목록, 수정, 삭제 API를 구현합니다.
@@ -75,6 +75,7 @@ export async function updateAdminProduct(
   const result = (await response.json()) as ApiResponse<{
     productId: number;
     categoryName: string;
+    categoryId?: string;
     name: string;
     basePrice: number;
     stockQuantity: number;
@@ -85,18 +86,12 @@ export async function updateAdminProduct(
     throw new Error(result.message || "상품을 수정할 수 없습니다");
   }
   const item = result.data;
-  const categories: Record<string, StoreProduct["category"]> = {
-    하우징: "housing",
-    기판: "keyboards",
-    스위치: "switches",
-    키캡: "keycaps",
-  };
   return {
     id: item.productId,
     slug: String(item.productId),
     name: item.name,
     basePrice: item.basePrice,
-    category: categories[item.categoryName] ?? "housing",
+    category: resolveProductCategory(item.categoryId, item.categoryName),
     description: item.description ?? "",
     stockQuantity: item.stockQuantity,
     shippingFee: 0,

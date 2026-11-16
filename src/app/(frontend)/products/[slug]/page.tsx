@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { AddToCart } from '@/features/products/add-to-cart'
 import { getProductById } from '@/features/products/api'
-import { formatPrice, mediaFrom } from '@/lib/store-shared'
+import { formatPrice, mediaFrom, productCategoryLabels } from '@/lib/store-shared'
 import { ProductImage } from '@/components/common/product-image'
 import type { StoreProduct } from '@/lib/store-shared'
 
@@ -46,7 +46,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </div>
         <div className="lg:sticky lg:top-28 lg:self-start">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            {product.brand} / {product.category.replace('-', ' ')}
+            {product.brand} / {productCategoryLabels[product.category]}
           </p>
           <h1 className="mt-5 text-5xl font-medium leading-none tracking-[-0.06em]">
             {product.name}

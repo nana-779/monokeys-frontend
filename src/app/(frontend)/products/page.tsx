@@ -2,7 +2,12 @@ import { ProductGrid } from '@/features/products/product-grid'
 import { getProducts } from '@/features/products/api'
 import type { StoreProduct } from '@/lib/store-shared'
 
-export default async function ProductsPage() {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ category?: string | string[] }> }) {
+  const { category } = await searchParams
+  const requestedCategory = category === 'keyboards' ? 'pcb' : category
+  const initialCategory = ['pcb', 'switches', 'keycaps', 'housing'].includes(requestedCategory as string)
+    ? requestedCategory as StoreProduct['category']
+    : 'all'
   let products: StoreProduct[] = []
   try {
     products = await getProducts()
@@ -20,7 +25,7 @@ export default async function ProductsPage() {
           Everything for a more considered desk.
         </h1>
       </div>
-      <ProductGrid products={products} />
+      <ProductGrid key={initialCategory} products={products} initialCategory={initialCategory} />
     </section>
   )
 }

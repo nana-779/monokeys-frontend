@@ -13,8 +13,8 @@ const categories = [
     children: ["알루미늄", "폴리카보네이트", "목재"],
   },
   {
-    label: "KEYBOARDS",
-    href: "/products?category=keyboards",
+    label: "PCB",
+    href: "/products?category=pcb",
     children: ["65%", "75%", "텐키리스"],
   },
   {
@@ -64,13 +64,25 @@ export function SiteHeader({
             aria-label="Utility navigation"
             className="absolute right-0 top-[18px] flex items-center gap-3 text-[10px] font-medium tracking-[-0.01em] text-[#34264b] sm:gap-5 sm:text-[12px] lg:gap-7 lg:text-[15px]"
           >
-            <button className="whitespace-nowrap" onClick={() => setSearchOpen(true)} type="button">
+            <button
+              className="whitespace-nowrap"
+              onClick={() => setSearchOpen(true)}
+              type="button"
+            >
               SEARCH
             </button>
-            <button className="whitespace-nowrap" onClick={onOpenCart} type="button">
+            <button
+              className="whitespace-nowrap"
+              onClick={onOpenCart}
+              type="button"
+            >
               CART <span aria-label={`${cartCount} items`}>({cartCount})</span>
             </button>
-            <button className="whitespace-nowrap" onClick={onOpenAccount} type="button">
+            <button
+              className="whitespace-nowrap"
+              onClick={onOpenAccount}
+              type="button"
+            >
               {user ? (user.role === "admin" ? "ADMIN" : "MYPAGE") : "LOGIN"}
             </button>
           </nav>
@@ -101,7 +113,10 @@ export function SiteHeader({
                   <ul className="space-y-2.5 text-sm text-zinc-600">
                     {category.children.map((child) => (
                       <li key={child}>
-                        <Link className="transition-colors hover:text-black" href={category.href}>
+                        <Link
+                          className="transition-colors hover:text-black"
+                          href={category.href}
+                        >
                           {child}
                         </Link>
                       </li>
@@ -137,7 +152,9 @@ export function SiteHeader({
             className="mx-auto flex max-w-3xl items-center gap-4 border-b-2 border-zinc-950 pb-4"
             onSubmit={(event) => event.preventDefault()}
           >
-            <label className="sr-only" htmlFor="store-search">상품 검색</label>
+            <label className="sr-only" htmlFor="store-search">
+              상품 검색
+            </label>
             <input
               autoFocus
               className="min-w-0 flex-1 bg-transparent text-3xl outline-none placeholder:text-zinc-300 sm:text-5xl"
@@ -148,7 +165,11 @@ export function SiteHeader({
               value={query}
             />
             {query && (
-              <button className="text-sm text-zinc-500" onClick={() => setQuery("")} type="button">
+              <button
+                className="text-sm text-zinc-500"
+                onClick={() => setQuery("")}
+                type="button"
+              >
                 지우기
               </button>
             )}

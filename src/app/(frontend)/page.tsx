@@ -1,50 +1,60 @@
-import Link from 'next/link'
-import { ArrowIcon } from '@/components/icons'
-import { ProductCard } from '@/components/common/product-card'
-import { ProductImage } from '@/components/common/product-image'
-import { mediaFrom } from '@/lib/store-shared'
-import { getPreviewProducts } from '@/features/products/preview-data'
-import { getProducts } from '@/features/products/api'
-import type { StoreProduct } from '@/lib/store-shared'
+import Link from "next/link";
+import { ArrowIcon } from "@/components/icons";
+import { ProductCard } from "@/components/common/product-card";
+import { ProductImage } from "@/components/common/product-image";
+import { mediaFrom } from "@/lib/store-shared";
+import { getPreviewProducts } from "@/features/products/preview-data";
+import { getProducts } from "@/features/products/api";
+import type { StoreProduct } from "@/lib/store-shared";
 
 const categoryCards = [
   {
-    label: 'KEYBOARDS',
-    detail: 'Built for the daily ritual',
-    href: '/products?category=keyboards',
+    label: "PCB",
+    detail: "The foundation of your custom build",
+    href: "/products?category=pcb",
   },
-  { label: 'SWITCHES', detail: 'Find your perfect feel', href: '/products?category=switches' },
-  { label: 'KEYCAPS', detail: 'A new texture for every key', href: '/products?category=keycaps' },
-]
+  {
+    label: "SWITCHES",
+    detail: "Find your perfect feel",
+    href: "/products?category=switches",
+  },
+  {
+    label: "KEYCAPS",
+    detail: "A new texture for every key",
+    href: "/products?category=keycaps",
+  },
+];
 
 export default async function HomePage() {
-  let products: StoreProduct[]
+  let products: StoreProduct[];
   try {
-    products = await getProducts()
+    products = await getProducts();
   } catch {
-    products = getPreviewProducts()
+    products = getPreviewProducts();
   }
-  const hero = products[0]
-  const heroImage = hero ? mediaFrom(hero.images[0]) : null
+  const hero = products[0];
+  const heroImage = hero ? mediaFrom(hero.images[0]) : null;
 
   return (
     <>
       <section className="mx-auto w-[min(80%,1440px)] py-8 max-lg:w-[92%]">
         <div className="relative min-h-[620px] overflow-hidden rounded-xl bg-zinc-100 max-md:min-h-[520px]">
           <ProductImage
-            alt={heroImage?.alt || hero?.name || '상품 이미지'}
+            alt={heroImage?.alt || hero?.name || "상품 이미지"}
             className="absolute inset-0 h-full w-full object-cover grayscale"
             src={heroImage?.url}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/25 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-12 text-white max-md:p-7">
-            <p className="mb-5 text-xs font-semibold tracking-[0.2em]">DESIGNED FOR THE DESK</p>
+            <p className="mb-5 text-xs font-semibold tracking-[0.2em]">
+              DESIGNED FOR THE DESK
+            </p>
             <h1 className="max-w-3xl text-6xl font-medium leading-[0.95] tracking-[-0.065em] max-md:text-4xl">
               Tools for better thinking.
             </h1>
             <p className="mt-6 max-w-lg text-base leading-7 text-white/75">
-              Considered keyboards, switches, and keycaps made to turn everyday work into a tactile
-              ritual.
+              Considered PCBs, switches, and keycaps made to turn everyday work
+              into a tactile ritual.
             </p>
             <Link
               className="mt-8 inline-flex items-center gap-4 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition hover:gap-6"
@@ -62,9 +72,14 @@ export default async function HomePage() {
             <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-zinc-500">
               CURATED ESSENTIALS
             </p>
-            <h2 className="text-4xl font-medium tracking-[-0.055em]">Best sellers</h2>
+            <h2 className="text-4xl font-medium tracking-[-0.055em]">
+              Best sellers
+            </h2>
           </div>
-          <Link className="flex items-center gap-3 text-sm font-medium" href="/products">
+          <Link
+            className="flex items-center gap-3 text-sm font-medium"
+            href="/products"
+          >
             VIEW ALL <ArrowIcon />
           </Link>
         </div>
@@ -86,7 +101,9 @@ export default async function HomePage() {
           <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-zinc-500">
             START WITH A FEELING
           </p>
-          <h2 className="mb-12 text-4xl font-medium tracking-[-0.055em]">Shop by category</h2>
+          <h2 className="mb-12 text-4xl font-medium tracking-[-0.055em]">
+            Shop by category
+          </h2>
           <div className="grid grid-cols-3 gap-5 max-md:grid-cols-1">
             {categoryCards.map((category, index) => (
               <Link
@@ -94,9 +111,13 @@ export default async function HomePage() {
                 href={category.href}
                 key={category.label}
               >
-                <span className="text-[10px] font-semibold tracking-[0.18em]">0{index + 1}</span>
+                <span className="text-[10px] font-semibold tracking-[0.18em]">
+                  0{index + 1}
+                </span>
                 <div>
-                  <h3 className="text-2xl font-medium tracking-[-0.04em]">{category.label}</h3>
+                  <h3 className="text-2xl font-medium tracking-[-0.04em]">
+                    {category.label}
+                  </h3>
                   <div className="mt-3 flex items-center justify-between text-sm text-zinc-500">
                     <span>{category.detail}</span>
                     <ArrowIcon className="transition-transform group-hover:translate-x-1" />
@@ -110,12 +131,18 @@ export default async function HomePage() {
       <footer className="bg-zinc-950 py-16 text-white">
         <div className="mx-auto flex w-[min(80%,1440px)] items-end justify-between max-lg:w-[92%] max-sm:block">
           <div>
-            <p className="text-2xl font-semibold tracking-[-0.04em]">MONO / KEYS</p>
-            <p className="mt-3 text-sm text-zinc-500">Objects for focused work.</p>
+            <p className="text-2xl font-semibold tracking-[-0.04em]">
+              MONO / KEYS
+            </p>
+            <p className="mt-3 text-sm text-zinc-500">
+              Objects for focused work.
+            </p>
           </div>
-          <p className="text-xs tracking-[0.1em] text-zinc-500 max-sm:mt-10">© 2025 MONO KEYS</p>
+          <p className="text-xs tracking-[0.1em] text-zinc-500 max-sm:mt-10">
+            © 2025 MONO KEYS
+          </p>
         </div>
       </footer>
     </>
-  )
+  );
 }

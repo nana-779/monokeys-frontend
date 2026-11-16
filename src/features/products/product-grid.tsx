@@ -4,19 +4,19 @@ import { useState } from "react";
 import { ProductCard } from "@/components/common/product-card";
 import type { StoreProduct } from "@/lib/store-shared";
 
-const filters = ["all", "keyboards", "switches", "keycaps", "housing"] as const;
+const filters = ["all", "pcb", "switches", "keycaps", "housing"] as const;
 type Filter = (typeof filters)[number];
 
 const filterLabels: Record<Filter, string> = {
   all: "ALL",
-  keyboards: "KEYBOARDS",
+  pcb: "기판",
   switches: "SWITCHES",
   keycaps: "KEYCAPS",
   housing: "HOUSING",
 };
 
-export function ProductGrid({ products }: { products: StoreProduct[] }) {
-  const [category, setCategory] = useState<Filter>("all");
+export function ProductGrid({ products, initialCategory = "all" }: { products: StoreProduct[]; initialCategory?: Filter }) {
+  const [category, setCategory] = useState<Filter>(initialCategory);
 
   const selectCategory = (filter: Filter) => {
     setCategory(filter);

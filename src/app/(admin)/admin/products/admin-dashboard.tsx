@@ -4,7 +4,7 @@ import type { AdminProductInput } from "@/features/admin/api";
 
 type View = "register" | "list" | "edit";
 type DialogType = "delete-all" | "delete-selected" | null;
-type CategoryValue = "" | "housing" | "keyboards" | "switches" | "keycaps";
+type CategoryValue = "" | "housing" | "pcb" | "switches" | "keycaps";
 type IconName =
   | "box"
   | "plus"
@@ -24,7 +24,7 @@ type IconName =
 
 const categories: { label: string; value: Exclude<CategoryValue, ""> }[] = [
   { label: "하우징", value: "housing" },
-  { label: "기판", value: "keyboards" },
+  { label: "기판", value: "pcb" },
   { label: "스위치", value: "switches" },
   { label: "키캡", value: "keycaps" },
 ];
@@ -357,7 +357,7 @@ function ProductForm({
                     layout: null,
                     housingMaterial: null,
                     supportPins: null,
-                    isWireless: nextCategory === "keyboards" ? false : null,
+                    isWireless: nextCategory === "pcb" ? false : null,
                     switchPin: null,
                     switchType: null,
                     keycapMaterial: null,
@@ -403,8 +403,7 @@ function ProductForm({
           </p>
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {(selectedCategory === "housing" ||
-              selectedCategory === "keyboards") && (
+            {(selectedCategory === "housing" || selectedCategory === "pcb") && (
               <Field label="배열 규격">
                 <select
                   className={inputClass}
@@ -446,7 +445,7 @@ function ProductForm({
               </Field>
             )}
 
-            {selectedCategory === "keyboards" && (
+            {selectedCategory === "pcb" && (
               <>
                 <Field label="기판 지원 핀 규격">
                   <select

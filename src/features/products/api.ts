@@ -1,22 +1,26 @@
-import { resolveProductCategory, type StoreProduct } from '@/lib/store-shared'
-import { API_BASE_URL } from '@/lib/api-client'
+import { resolveProductCategory, type StoreProduct } from "@/lib/store-shared";
+import { API_BASE_URL } from "@/lib/api-client";
 
 type ProductResponse = {
-  productId: number
-  categoryName: string
-  categoryId?: string
-  name: string
-  basePrice: number
-  stockQuantity: number
-  thumbnailUrl: string | null
-  description: string | null
-  active: boolean
-}
+  productId: number;
+  categoryName: string;
+  categoryId?: string;
+  name: string;
+  basePrice: number;
+  stockQuantity: number;
+  thumbnailUrl: string | null;
+  description: string | null;
+  active: boolean;
+};
 
-type ApiResponse<T> = { success: boolean; message: string | null; data: T | null }
+type ApiResponse<T> = {
+  success: boolean;
+  message: string | null;
+  data: T | null;
+};
 
 function toStoreProduct(item: ProductResponse): StoreProduct {
-  const category = resolveProductCategory(item.categoryId, item.categoryName)
+  const category = resolveProductCategory(item.categoryId, item.categoryName);
 
   return {
     id: item.productId,
@@ -24,29 +28,39 @@ function toStoreProduct(item: ProductResponse): StoreProduct {
     name: item.name,
     basePrice: item.basePrice,
     category,
-    description: item.description ?? '',
+    description: item.description ?? "",
     stockQuantity: item.stockQuantity,
     shippingFee: 0,
-    brand: '',
-    images: item.thumbnailUrl ? [{ id: item.productId, url: item.thumbnailUrl, alt: item.name }] : [],
-  }
+    brand: "",
+    images: item.thumbnailUrl
+      ? [{ id: item.productId, url: item.thumbnailUrl, alt: item.name }]
+      : [],
+  };
 }
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { headers: { Accept: 'application/json' } })
-  const result = await response.json() as ApiResponse<T>
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { Accept: "application/json" },
+  });
+  const result = (await response.json()) as ApiResponse<T>;
   if (!response.ok || !result.success || result.data == null) {
-    throw new Error(result.message || '상품 정보를 불러올 수 없습니다.')
+    throw new Error(result.message || "상품 정보를 불러올 수 없습니다.");
   }
-  return result.data
+  return result.data;
 }
 
-export async function getProducts(category?: StoreProduct['category']): Promise<StoreProduct[]> {
-  const items = await request<ProductResponse[]>('/products')
-  return items.map(toStoreProduct).filter((item) => !category || item.category === category)
+export async function getProducts(
+  category?: StoreProduct["category"],
+): Promise<StoreProduct[]> {
+  const items = await request<ProductResponse[]>("/products");
+  return items
+    .map(toStoreProduct)
+    .filter((item) => !category || item.category === category);
 }
 
 export async function getProductById(productId: string): Promise<StoreProduct> {
-  const item = await request<ProductResponse>(`/products/${encodeURIComponent(productId)}`)
-  return toStoreProduct(item)
+  const item = await request<ProductResponse>(
+    `/products/${encodeURIComponent(productId)}`,
+  );
+  return toStoreProduct(item);
 }

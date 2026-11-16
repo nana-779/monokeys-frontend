@@ -48,9 +48,33 @@ POST /api/dev/toss-orders(본문 없음,201)로 생성한 뒤 GET /api/dev/toss-
 
 검증 명령은 pnpm run test:payments-sdk(초기화7+주문준비7), pnpm exec tsc --noEmit, pnpm build입니다. 실제 키 없는 환경에서 테스트와 운영 빌드를 진행하세요. 테스트/운영 브랜치 검증과 원본 로컬 브라우저 확인 결과를 구분해야 합니다.
 
-현재 완료 범위는 환경 준비·SDK 초기화·테스트 주문 조회 및 금액 설정까지입니다. 결제 요청·성공/실패 페이지·최종 승인·취소·웹훅·결제 DB 저장은 다음 단계입니다. 주문 준비/SDK 금액 설정 성공은 실제 토스 API 인증이나 결제 성공 검증이 아닙니다.
 
 
-## 4단계: 결제수단·약관 UI
+## 4·5단계: 공식 UI와 결제 요청·구매자 인증
 
-기존 /dev/toss-order의 서버 주문 생성·조회·금액 설정 이후 공식 renderPaymentMethods와 renderAgreement를 순서대로 렌더링합니다. 로딩/완료/실패 상태, Strict Mode의 중복 마운트·정리·재시도를 처리합니다. 실제 결제 요청이나 승인 호출은 없습니다. 프론트 자동 테스트는 초기화7+주문준비7+렌더링6=20개입니다.
+기존 개발 주문과 공식 renderPaymentMethods/renderAgreement UI를 유지하고 테스트 결제하기 버튼을 연결했습니다. UI 렌더 완료 전에는 요청할 수 없습니다. 서버 GET으로 저장된 주문을 결제 직전에 다시 확인하고 주문번호·상품명·KRW 금액·PENDING을 비교합니다. 15초 조회 제한, 즉시 중복 잠금, 요청 중 주문 재생성 차단, 오류·취소 재시도를 처리합니다. SDK 자체가 진행 중일 때 임의 타임아웃으로 잠금을 해제하지 않습니다.
+
+requestPayment에는 SDK가 지원하는 orderId/orderName/successUrl/failUrl을 전달합니다. 금액은 3단계 setAmount의 서버 금액을 사용합니다. getSelectedPaymentMethod는 이번 흐름에 필요하지 않아 호출하지 않습니다. 공식 SDK가 선택된 결제수단과 약관 검사를 처리하며 카드사·앱 인증 UI를 직접 만들지 않았습니다.
+
+결과 경로는 /dev/toss-order/success와 /dev/toss-order/fail입니다. 두 경로도 개발 모드와 명시적 활성화를 요구합니다. 성공 URL은 요청 직전 sessionStorage에 저장한 주문과 orderId/amount/paymentKey 필수값을 검사하고 서버 주문을 재조회합니다. paymentKey는 로그·저장소·화면에 기록하지 않습니다. URL만으로 토스 인증의 진위를 확정할 수 없으며 최종 승인/결제완료 처리는 하지 않습니다. 실패 코드는 제한된 형식만 표시하고 제공자의 원문 메시지는 출력하지 않습니다.
+
+기존 테스트 키 검사(test_gck_)를 요청 전에도 반복합니다. 테스트 주문은 서버 메모리 저장(최대1000건/30분)이며 실제 DB 주문이 아닙니다. 실제 주문으로 교체할 때는 dev-test-orders.ts의 연결과 서버 주문 검증을 함께 교체해야 합니다. /checkout과 회원·로그인 코드는 변경하지 않았습니다.
+
+### 검증과 수동 확인
+
+- pnpm run test:payments-sdk: 기존20 + 신규9 = 29개 통과.
+- node node_modules/typescript/bin/tsc --noEmit: 통과.
+- Windows에서 기존 POSIX build 스크립트와 동등하게 NODE_OPTIONS=--no-deprecation을 프로세스에 설정하고 node node_modules/next/dist/bin/next build: 통과. 기존 Google Fonts 다운로드를 위한 네트워크 접근이 필요했습니다.
+- 백엔드 기존 결제 설정·개발 주문 테스트22개와 Gradle build 통과. 전체 애플리케이션 MySQL 테스트는 실행하지 않았습니다.
+
+실제 인증 확인: 이 작업 공간을 테스트 키 및 TOSS_PAYMENTS_DEV_ORDERS_ENABLED=true로 localhost:3000에 실행하고, 기존 개발 주문 백엔드(local 프로필+활성화)를 사용하세요. 기존 서버를 임의 종료하지 말고 포트 전환은 사용자가 결정해야 합니다. 개인 .env.local/키는 작업 공간에 복사하거나 커밋하지 않았습니다. 테스트 공개 클라이언트 키는 별도 미리보기 프로세스의 환경변수로만 전달했습니다.
+
+1. /dev/toss-order 접속 → 테스트 주문 준비 → 공식 결제수단·약관 표시.
+2. 필수 약관 확인 → 테스트 결제하기 → 공식 결제창/구매자 인증에서 사용자 조작.
+3. 성공 시 /dev/toss-order/success에서 서버 주문 일치와 최종 승인 미실행 문구 확인.
+4. 취소 시 현재 화면 안내 또는 SDK 동작에 따른 실패 URL 이동 확인. 취소가 항상 failUrl로 이동한다고 가정하지 않습니다.
+5. 실패 경로, 연속 클릭, 주문 만료 후 요청 거부를 확인합니다.
+
+별도 포트3001 미리보기에서는 SDK 초기화, 주문 준비 오류 안내, fail?code=USER_CANCEL 표시, 필수값 없는 success 거부를 브라우저로 확인했습니다. 기존 백엔드 CORS가 localhost:3000만 허용하므로3001에서 정상 주문 준비·공식 결제 인증까지 검증하지 않았습니다. 실제 카드사/휴대폰/앱 인증, 성공 리다이렉트, 결제수단별 실패 리다이렉트와 실청구 없음은 사용자 확인이 남아 있습니다. 합성 URL 확인은 실제 토스 인증 성공을 의미하지 않습니다.
+
+최종 승인 API, 결제 DB 저장, 취소 API, 웹훅은 이번 단계에 포함하지 않습니다. Git commit/push/merge/PR을 수행하지 않았습니다.

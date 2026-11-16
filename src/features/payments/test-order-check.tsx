@@ -5,6 +5,8 @@ import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk'
 import { mountOrderWidgets, OrderWidgetRenderingError } from './order-widget-rendering'
 import { createDevTestOrder, getDevTestOrder } from './dev-test-orders'
 import { prepareTestOrder, type DevTestOrder } from './test-order-preparation'
+import { createPaymentRequester, paymentErrorMessage } from './payment-request'
+import { PAYMENT_ATTEMPT_KEY } from './payment-result'
 
 type State =
   | { status: 'idle' | 'loading' | 'error'; message: string }
@@ -12,6 +14,14 @@ type State =
 export default function TestOrderCheck({ widgets }: { widgets: TossPaymentsWidgets }) {
   const [state, setState] = useState<State>({ status: 'idle', message: '' })
   const [widgetState, setWidgetState] = useState({ status: 'idle', message: '' })
+  const [paying, setPaying] = useState(false)
+  const [paymentMessage, setPaymentMessage] = useState('')
+  const paymentPending = useRef<AbortController | null>(null)
+  const requestPayment = useRef(createPaymentRequester({
+    find: getDevTestOrder,
+    request: (value) => widgets.requestPayment(value),
+    remember: (value) => sessionStorage.setItem(PAYMENT_ATTEMPT_KEY, JSON.stringify(value)),
+  }))
   const widgetId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const paymentSelector = '#toss-payment-' + widgetId
   const agreementSelector = '#toss-agreement-' + widgetId
@@ -37,11 +47,14 @@ export default function TestOrderCheck({ widgets }: { widgets: TossPaymentsWidge
     return () => {
       mounted.current = false
       pending.current?.abort()
+      paymentPending.current?.abort()
     }
   }, [])
 
   async function prepare() {
-    if (pending.current) return
+    if (pending.current || paymentPending.current) return
+    setPaymentMessage('')
+    setWidgetState({ status: 'idle', message: '' })
     const controller = new AbortController()
     pending.current = controller
     const timeout = setTimeout(() => controller.abort(), 20000)
@@ -68,11 +81,28 @@ export default function TestOrderCheck({ widgets }: { widgets: TossPaymentsWidge
       if (pending.current === controller) pending.current = null
     }
   }
-  // 타임아웃/언마운트 후에도 SDK 작업이 진행 중일 수 있어 동일 인스턴스의 후속 변경은 직렬화합니다.
+  async function pay() {
+    if (paymentPending.current || pending.current || !order) return
+    const controller = new AbortController()
+    paymentPending.current = controller
+    setPaying(true)
+    setPaymentMessage('서버 주문 확인 및 테스트 결제 인증을 요청하고 있습니다.')
+    try {
+      await requestPayment.current({ order, ready: widgetState.status === 'ready',
+        clientKey: process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY,
+        origin: window.location.origin, signal: controller.signal })
+      if (mounted.current) setPaymentMessage('결과 화면으로 이동하지 않았다면 결제 인증 결과를 확인한 뒤 다시 시도해 주세요.')
+    } catch (error) {
+      if (mounted.current) setPaymentMessage(paymentErrorMessage(error))
+    } finally {
+      paymentPending.current = null
+      if (mounted.current) setPaying(false)
+    }
+  }
   return (
     <section>
       <h2>개발 테스트 주문 준비</h2>
-      <button type="button" disabled={state.status === 'loading'} onClick={prepare}>
+      <button type="button" disabled={state.status === 'loading' || paying} onClick={prepare}>
         테스트 주문 생성 및 금액 설정
       </button>
       <p role="status">
@@ -96,9 +126,13 @@ export default function TestOrderCheck({ widgets }: { widgets: TossPaymentsWidge
         <h3>결제 약관</h3>
         <div id={agreementSelector.slice(1)} />
         <p role={widgetState.status === 'error' ? 'alert' : 'status'}>{widgetState.message}</p>
+        <button type="button" onClick={pay} disabled={paying || state.status !== 'ready' || widgetState.status !== 'ready'}>
+          {paying ? '테스트 결제 인증 요청 중…' : '테스트 결제하기'}
+        </button>
+        <p role="status">{paymentMessage}</p>
       </section>
       <p>
-        테스트 주문은 30분 후 만료되며 서버 재시작 시 삭제됩니다. 실제 결제는 진행하지 않습니다.
+        테스트 주문은 30분 후 만료되며 서버 재시작 시 삭제됩니다. 테스트 키로 구매자 인증만 진행하며 최종 결제 승인 API는 호출하지 않습니다.
       </p>
     </section>
   )

@@ -19,3 +19,13 @@ Node.js 24와 기존 pnpm 및 pnpm-lock.yaml을 사용합니다. 설치는 pnpm 
 이 단계는 환경 준비이며 SDK/API 인증·결제 성공 검증이 아닙니다.
 
 공식 문서: https://docs.tosspayments.com/sdk/v2/js/payment-widget
+
+## 2단계: SDK 초기화 확인
+
+공식 @tosspayments/tosspayments-sdk 2.10.0을 사용합니다. pnpm install --frozen-lockfile 후 pnpm local로 실행하고 http://localhost:3000/dev/toss-sdk에 접속하세요. 키 변경 시 서버를 재시작합니다.
+
+브라우저에서 공개 환경변수로 loadTossPayments()를 호출하고 SDK의 ANONYMOUS 식별값으로 widgets()를 생성합니다. 초기화 중/성공/실패와 재시도만 표시합니다. 클라이언트 전용 실행, 테스트 키 형식, 20초 제한, 공유 Promise로 Strict Mode 중복 초기화 방지, 실패 시 캐시 초기화, 언마운트 후 상태 갱신 차단을 처리합니다.
+
+운영 빌드에서는 확인 페이지가 404를 반환합니다. 테스트는 pnpm run test:payments-sdk, 타입 검사는 pnpm exec tsc --noEmit, 빌드는 pnpm build입니다. 현재 lint 스크립트는 없습니다. SDK 단위 테스트는 실제 키 없이 fixture_only 문자열과 가짜 SDK로 실행하며 네트워크/API 인증을 검증하지 않습니다. SDK 로드·비회원 인스턴스 생성 성공도 실제 API 인증·결제 성공을 뜻하지 않습니다.
+
+결제 금액 설정·결제 UI·결제 요청은 이 단계에 포함하지 않습니다.

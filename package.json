@@ -8,9 +8,11 @@
     "local": "node scripts/local-dev.mjs",
     "build": "NODE_OPTIONS=--no-deprecation next build",
     "start": "NODE_OPTIONS=--no-deprecation next start",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "test:payments-sdk": "node scripts/test-payments-sdk.mjs"
   },
   "dependencies": {
+    "@tosspayments/tosspayments-sdk": "2.10.0",
     "html-react-parser": "^5.2.10",
     "next": "16.4.2",
     "react": "19.3.1",

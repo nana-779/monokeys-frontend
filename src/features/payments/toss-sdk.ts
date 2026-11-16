@@ -1,0 +1,18 @@
+'use client'
+
+import {
+  ANONYMOUS,
+  clearTossPayments,
+  loadTossPayments,
+  type TossPaymentsWidgets,
+} from '@tosspayments/tosspayments-sdk'
+import { createWidgetsInitializer } from './widgets-initializer'
+
+// 동적 키 접근을 사용하지 않아 Next.js가 공개 환경변수를 클라이언트 번들에 주입할 수 있습니다.
+export const initializeTossWidgets = createWidgetsInitializer<TossPaymentsWidgets>({
+  isClient: () => typeof window !== 'undefined',
+  readClientKey: () => process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY,
+  load: (clientKey) => loadTossPayments(clientKey),
+  anonymousCustomerKey: ANONYMOUS,
+  clear: clearTossPayments,
+})

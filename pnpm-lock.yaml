@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@tosspayments/tosspayments-sdk':
+        specifier: 2.10.0
+        version: 2.10.0
       html-react-parser:
         specifier: ^5.2.10
         version: 5.2.17(@types/react@19.3.0)(react@19.3.1)
@@ -504,6 +507,9 @@ packages:
 
   '@tailwindcss/postcss@4.3.3':
     resolution: {integrity: sha512-JTSZZGQi1AyKirbLN3azmjVzef92tcX7h+iSqPdaeStyFpGpDlKvvpxeOE8njhbUanbRwr3z8DyzhICWnMtQeg==}
+
+  '@tosspayments/tosspayments-sdk@2.10.0':
+    resolution: {integrity: sha512-nwpLRKPBwFvajv6MG2bCqB9dAyeHeIAhBaTeAEm9T0NHvjGrv11pGtWEF+GEXXwNGlof4LROZEKQEJMe808U7w==}
 
   '@types/node@24.12.3':
     resolution: {integrity: sha512-8oljBDGun9cIsZRJR6fkihn0TSXJI0UDOOhncYaERq6M0JMDoPLxyscwruJcb4GKS6dvK/d8xebYBg27h/duaQ==}
@@ -1147,6 +1153,8 @@ snapshots:
       '@tailwindcss/oxide': 4.3.3
       postcss: 8.5.29
       tailwindcss: 4.3.3
+
+  '@tosspayments/tosspayments-sdk@2.10.0': {}
 
   '@types/node@24.12.3':
     dependencies:

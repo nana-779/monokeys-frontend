@@ -40,7 +40,7 @@ export async function createAdminProduct(
     new Blob([JSON.stringify(input)], { type: "application/json" }),
   );
   if (image) body.append("image", image);
-  const response = await fetch(`${API_BASE_URL}/admin/products`, {
+  const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
     method: "POST",
     body,
   });
@@ -66,7 +66,7 @@ export async function updateAdminProduct(
   );
   if (image) body.append("image", image);
   const response = await fetch(
-    `${API_BASE_URL}/admin/products/${encodeURIComponent(productId)}/edit`,
+    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}/edit`,
     {
       method: "PATCH",
       body,
@@ -104,7 +104,7 @@ export async function updateAdminProduct(
 
 export async function deleteAdminProduct(productId: string): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/admin/products/${encodeURIComponent(productId)}`,
+    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
     {
       method: "DELETE",
     },

@@ -91,7 +91,7 @@ export default function TestOrderCheck({ widgets }: { widgets: TossPaymentsWidge
       await requestPayment.current({ order, ready: widgetState.status === 'ready',
         clientKey: process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY,
         origin: window.location.origin, signal: controller.signal })
-      if (mounted.current) setPaymentMessage('결과 화면으로 이동하지 않았다면 결제 인증 결과를 확인한 뒤 다시 시도해 주세요.')
+      if (mounted.current) setPaymentMessage('결과 화면으로 이동하지 않았다면 다시 결제하지 말고 기존 결제 인증 결과를 확인해 주세요.')
     } catch (error) {
       if (mounted.current) setPaymentMessage(paymentErrorMessage(error))
     } finally {
@@ -132,7 +132,7 @@ export default function TestOrderCheck({ widgets }: { widgets: TossPaymentsWidge
         <p role="status">{paymentMessage}</p>
       </section>
       <p>
-        테스트 주문은 30분 후 만료되며 서버 재시작 시 삭제됩니다. 테스트 키로 구매자 인증만 진행하며 최종 결제 승인 API는 호출하지 않습니다.
+        테스트 주문은 30분 후 만료되며 서버 재시작 시 삭제됩니다. 인증 성공 화면에서 백엔드 승인 API를 호출합니다. 결과가 불확실하면 새 결제를 요청하지 말고 기존 결과를 확인해 주세요.
       </p>
     </section>
   )

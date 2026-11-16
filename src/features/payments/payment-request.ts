@@ -2,6 +2,7 @@ import { validateDevOrder, type DevTestOrder } from './test-order-preparation'
 
 export type PaymentRequest = { orderId: string; orderName: string; successUrl: string; failUrl: string }
 export class PaymentRequestError extends Error {}
+const retryableSdkCodes = new Set(['USER_CANCEL', 'PAY_PROCESS_CANCELED', 'NOT_AGREED_REQUIRED_TERMS'])
 
 export function paymentUrls(origin: string) {
   const url = new URL(origin)
@@ -30,6 +31,7 @@ export function createPaymentRequester(deps: {
   remember: (order: DevTestOrder) => void
 }) {
   let busy = false
+  const submitted = new Set<string>()
   return async (input: { order: DevTestOrder; ready: boolean; clientKey: string | undefined; origin: string; signal: AbortSignal }) => {
     if (busy) throw new PaymentRequestError('결제 요청이 진행 중입니다.')
     busy = true
@@ -37,6 +39,7 @@ export function createPaymentRequester(deps: {
       if (!input.ready) throw new PaymentRequestError('결제수단과 약관 UI 준비가 끝난 뒤 다시 시도해 주세요.')
       if (!/^test_gck_[A-Za-z0-9_-]+$/.test(input.clientKey ?? '')) throw new PaymentRequestError('테스트 주문서형 클라이언트 키만 사용할 수 있습니다.')
       const prepared = validateDevOrder(input.order)
+      if (submitted.has(prepared.orderId)) throw new PaymentRequestError('이미 결제 인증을 요청한 주문입니다. 다시 결제하지 말고 기존 결제 결과를 확인해 주세요.')
       const urls = paymentUrls(input.origin)
       input.signal.throwIfAborted()
       // Bound only the abortable server lookup; never unlock a still-running SDK payment request.
@@ -48,7 +51,18 @@ export function createPaymentRequester(deps: {
         throw new PaymentRequestError('서버 주문 정보가 변경되었습니다. 테스트 주문을 다시 준비해 주세요.')
       deps.remember(saved)
       input.signal.throwIfAborted()
-      await deps.request({ orderId: saved.orderId, orderName: saved.orderName, ...urls })
+      // Keep the order blocked after a resolved/uncertain SDK result, not just while a click is busy.
+      submitted.add(saved.orderId)
+      try {
+        await deps.request({ orderId: saved.orderId, orderName: saved.orderName, ...urls })
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        if (typeof code === 'string' && retryableSdkCodes.has(code)) {
+          submitted.delete(saved.orderId)
+          throw error
+        }
+        throw new PaymentRequestError('결제 인증 결과를 확인하지 못했습니다. 다시 결제하지 말고 기존 결제 결과를 확인해 주세요.')
+      }
     } finally { busy = false }
   }
 }

@@ -62,7 +62,7 @@ test('success validation rejects blank or control keys and unsafe/noncanonical a
 test('failure classification covers cancellation, rejection, general and system errors', () => {
   for(const[code,category]of [['USER_CANCEL','cancelled'],['PAY_PROCESS_CANCELED','cancelled'],
     ['REJECT_CARD_COMPANY','card-rejected'],['PAY_PROCESS_ABORTED','failed'],['NETWORK_ERROR','system-error'],
-    ['PROVIDER_STATUS_UNHEALTHY','system-error'],['UNDOCUMENTED_CODE','failed']]){
+    ['PROVIDER_STATUS_UNHEALTHY','system-error'],['UNDOCUMENTED_CODE','system-error']]){
     const failure=readFailure(new URLSearchParams({code,message:'untrusted details'}))
     assert.equal(failure.category,category);assert.ok(!failure.message.includes('untrusted'))
   }

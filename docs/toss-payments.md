@@ -95,3 +95,38 @@ requestPayment에는 SDK가 지원하는 orderId/orderName/successUrl/failUrl을
 7번 이후: 실제 승인 URL·요청/응답 계약, 서버 측 멱등성, 승인 결과 재조회·저장·응답 검증, 실제 승인 성공/실패 테스트가 필요합니다. 프론트 잠금만으로 새로고침·다른 탭·다른 장치의 중복 승인을 막을 수는 없습니다. 실제 주문 API/표시는 후속 범위입니다.
 
 이번 단계는 실제 인증·승인 요청, DB 변경, 회원/쇼핑몰 변경, Git commit/push/merge/PR 및 실행 중 서버 전환을 하지 않습니다. 6-1~6-18 원문은 현재 대화·첨부·프로젝트 문서에서 확인되지 않아, 사용자 메시지의14개 요구 항목을 기준으로 구현했습니다. 원문 번호별 완료 판정은 보류합니다.
+
+## 6-8~6-11: 개발 승인 API 연결
+
+기존 `/dev/toss-order/success`, `/dev/toss-order/fail`과 화면 구조를 유지합니다.
+성공 URL 필수값과 sessionStorage의 요청 주문을 검증하고 서버 GET으로 주문번호·금액·상품명·KRW·PENDING을 대조한 뒤
+POST `/api/payments/confirm`에 paymentKey/orderId/amount를 보냅니다. 실제 주문·회원·상품·장바구니 코드는 변경하지 않습니다.
+
+- 결제 전용 클라이언트가 기존 NEXT_PUBLIC_API_BASE_URL과 credentials:include 규칙을 사용합니다.
+- 공통 apiRequest/ApiRequestError는 변경하지 않습니다. 전용 어댑터가 HTTP200/202, 실제 응답 DTO 및 오류 코드를 검사합니다.
+- 200 + DONE + completed=true, 주문번호/금액/KRW/승인일시/수단 일치일 때만 테스트 결제 완료로 표시합니다.
+- 200 WAITING_FOR_DEPOSIT는 입금 대기이며 완료가 아닙니다. 현재 백엔드는 이 결과를 캐시하므로 재요청으로 입금 완료를 갱신할 수 없습니다.
+- 202 CONFIRMING/UNKNOWN, 네트워크·타임아웃·잘못된 응답은 완료나 확정 실패로 간주하지 않습니다.
+- 서버의 승인 대기 최대120초·연결5초를 고려해 승인 호출은135초 제한입니다. 주문 GET의15초 제한과 분리했습니다.
+- Strict Mode/동시 구독자는 진행 중인 조회·승인을 공유합니다. 다른 결제키는 같은 결과를 공유하지 않습니다.
+- 언마운트는 화면 갱신만 차단합니다. 공유 승인 요청을 취소하거나 결제 실패로 단정하지 않습니다.
+- 미확정 상태는 자동 폴링하지 않습니다. 최소3초 후 '같은 요청 상태 다시 확인' 버튼으로 동일 세 값을 다시 보냅니다.
+- 서버는 이미 시작한 요청을 재승인하지 않고 상태 조회/기존 결과로 처리합니다. 프론트 잠금이 서버 멱등성을 대신하지 않습니다.
+- sessionStorage의 검토 마커에는 주문번호/금액/요청 시작 힌트만 저장하며 paymentKey·완료 상태는 저장하지 않습니다.
+- 마커는 완료 판정에 사용하지 않습니다. 원래 개발 주문이 만료된 재시도에서 서버 승인 저장소에 상태 확인을 요청할 수 있게 하는 힌트일 뿐입니다.
+- 콜백 필수값·요청 주문 검증과 서버의 최종 검증은 마커와 무관하게 유지됩니다.
+- 오류는 실제 내부 code/providerCode의 허용 목록으로 분류하고 서버/제공자 원문 메시지는 표시하지 않습니다.
+
+### 후속 실제 샌드박스 확인에 필요한 구성
+
+프론트: NODE_ENV=development, 기존 테스트 공개 키, TOSS_PAYMENTS_DEV_ORDERS_ENABLED=true,
+NEXT_PUBLIC_API_BASE_URL이 해당 백엔드를 가리키는 설정이 필요합니다.
+백엔드: local 활성·prod/production 비활성, 기존 테스트 시크릿 키,
+TOSS_PAYMENTS_DEV_ORDERS_ENABLED=true, TOSS_PAYMENTS_TEST_ENABLED=true,
+TOSS_PAYMENTS_DEV_CONFIRM_ENABLED=true가 모두 필요합니다.
+브라우저 Origin은 기존 cors.allowed-origin(현재 localhost:3000)과 같아야 하고 백엔드 연결은 루프백이어야 합니다.
+프론트/서버 키는 같은 상점 테스트 키 쌍이어야 합니다. 시크릿 키를 프론트에 등록하지 않습니다.
+이번 작업에서는 환경파일/실행 설정 변경, 서버 재시작, 실제 SDK 인증·토스 승인 요청을 하지 않습니다.
+
+검증: `node scripts/test-payments-sdk.mjs`, `pnpm typecheck`, `pnpm build`.
+자동화 테스트는 가짜 전송 함수로만 승인 응답을 검증하며 실제 결제 API를 호출하지 않습니다.

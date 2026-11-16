@@ -33,8 +33,12 @@ export function readSuccess(params: URLSearchParams, attempt: string | null): De
 }
 export type FailureCategory = 'cancelled' | 'card-rejected' | 'failed' | 'system-error'
 export function readFailure(params: URLSearchParams) {
-  const code = single(params, 'code')!
-  if (!/^[A-Z0-9_]{1,100}$/.test(code)) throw new ResultValidationError()
+  const rawCode = single(params, 'code')!
+  if (!/^[A-Z0-9_]{1,100}$/.test(rawCode)) throw new ResultValidationError()
+  const knownCodes = new Set(['USER_CANCEL', 'PAY_PROCESS_CANCELED', 'REJECT_CARD_COMPANY', 'REJECT_CARD_PAYMENT',
+    'NETWORK_ERROR', 'PROVIDER_STATUS_UNHEALTHY', 'FAILED_INTERNAL_SYSTEM_PROCESSING', 'FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING',
+    'PAY_PROCESS_ABORTED', 'EXPIRED_PAYMENT', 'UNKNOWN'])
+  const code = knownCodes.has(rawCode) ? rawCode : 'UNKNOWN'
   const rawMessage = single(params, 'message', true)
   if (rawMessage !== undefined && (rawMessage.length > 500 || /[\u0000-\u001f\u007f]/u.test(rawMessage))) throw new ResultValidationError()
   const orderId = single(params, 'orderId', true)
@@ -45,7 +49,7 @@ export function readFailure(params: URLSearchParams) {
   } else if (['REJECT_CARD_COMPANY', 'REJECT_CARD_PAYMENT'].includes(code)) {
     category = 'card-rejected'; message = '카드사에서 결제를 거절했습니다. 결제수단을 확인하거나 다른 수단으로 다시 시도해 주세요.'
   } else if (['NETWORK_ERROR', 'PROVIDER_STATUS_UNHEALTHY', 'FAILED_INTERNAL_SYSTEM_PROCESSING', 'FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING', 'UNKNOWN'].includes(code)) {
-    category = 'system-error'; message = '결제 시스템 또는 네트워크 오류입니다. 잠시 후 다시 시도해 주세요.'
+    category = 'system-error'; message = '결제 결과를 확인하지 못했습니다. 다시 결제하지 말고 기존 결제 상태를 먼저 확인해 주세요.'
   } else {
     category = 'failed'; message = '결제 인증이 실패했습니다. 테스트 주문을 다시 준비해 주세요.'
   }

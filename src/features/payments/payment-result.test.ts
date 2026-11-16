@@ -23,3 +23,20 @@ test('fail callback maps cancellation and does not render arbitrary message', ()
   assert.throws(() => readFailure(new URLSearchParams('code=A&code=B')))
   assert.throws(() => readFailure(new URLSearchParams('code=%3Cscript%3E')))
 })
+
+test('unknown fail codes are not echoed and never instruct another payment', () => {
+  const value = readFailure(new URLSearchParams({ code: 'PRIVATE_PROVIDER_DIAGNOSTIC', message: 'private details' }))
+  assert.equal(value.code, 'UNKNOWN'); assert.equal(value.category, 'system-error')
+  assert.match(value.message, /다시 결제하지 말고/)
+  assert.ok(!JSON.stringify(value).includes('PRIVATE_PROVIDER_DIAGNOSTIC'))
+  assert.ok(!JSON.stringify(value).includes('private details'))
+})
+
+test('known network failures ask for status checking while definite failures keep their classification', () => {
+  for (const code of ['NETWORK_ERROR', 'FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING', 'UNKNOWN']) {
+    const value = readFailure(new URLSearchParams({ code }))
+    assert.equal(value.category, 'system-error'); assert.match(value.message, /기존 결제 상태/)
+  }
+  assert.equal(readFailure(new URLSearchParams({ code: 'EXPIRED_PAYMENT' })).category, 'failed')
+  assert.equal(readFailure(new URLSearchParams({ code: 'REJECT_CARD_COMPANY' })).category, 'card-rejected')
+})

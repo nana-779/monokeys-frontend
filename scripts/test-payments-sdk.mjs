@@ -22,8 +22,11 @@ for (const name of [
   'payment-request.test',
   'payment-result',
   'payment-result.test',
+  'payment-confirmation',
+  'payment-confirmation.test',
   'payment-result-flow',
   'payment-result-flow.test',
+  'payment-result-approval.test',
 ]) {
   let code = await fs.readFile(path.join(root, `src/features/payments/${name}.ts`), 'utf8')
   code = code.replace("'./widgets-initializer'", "'./widgets-initializer.mjs'")
@@ -31,6 +34,7 @@ for (const name of [
   code = code.replace("'./order-widget-rendering'", "'./order-widget-rendering.mjs'")
   code = code.replace("'./payment-request'", "'./payment-request.mjs'")
   code = code.replace("'./payment-result'", "'./payment-result.mjs'")
+  code = code.replace("'./payment-confirmation'", "'./payment-confirmation.mjs'")
   code = code.replace("'./payment-result-flow'", "'./payment-result-flow.mjs'")
   const result = ts.transpileModule(code, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
@@ -47,7 +51,9 @@ const result = spawnSync(
     path.join(output, 'order-widget-rendering.test.mjs'),
     path.join(output, 'payment-request.test.mjs'),
     path.join(output, 'payment-result.test.mjs'),
+    path.join(output, 'payment-confirmation.test.mjs'),
     path.join(output, 'payment-result-flow.test.mjs'),
+    path.join(output, 'payment-result-approval.test.mjs'),
   ],
   {
     stdio: 'inherit',

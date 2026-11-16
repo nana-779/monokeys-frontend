@@ -29,3 +29,23 @@ Node.js 24와 기존 pnpm 및 pnpm-lock.yaml을 사용합니다. 설치는 pnpm 
 운영 빌드에서는 확인 페이지가 404를 반환합니다. 테스트는 pnpm run test:payments-sdk, 타입 검사는 pnpm exec tsc --noEmit, 빌드는 pnpm build입니다. 현재 lint 스크립트는 없습니다. SDK 단위 테스트는 실제 키 없이 fixture_only 문자열과 가짜 SDK로 실행하며 네트워크/API 인증을 검증하지 않습니다. SDK 로드·비회원 인스턴스 생성 성공도 실제 API 인증·결제 성공을 뜻하지 않습니다.
 
 결제 금액 설정·결제 UI·결제 요청은 이 단계에 포함하지 않습니다.
+
+## 3단계: 테스트 주문과 결제금액 준비
+
+개인 .env.local의 TOSS_PAYMENTS_DEV_ORDERS_ENABLED=true로 설정하고 해당 개발 서버를 재시작합니다. 백엔드에도 같은 플래그 true와 local 프로필이 필요합니다. 기존 활성 프로필을 덮어쓰지 말고 백엔드 안내를 따르세요.
+
+http://localhost:3000/dev/toss-order에 접속 → SDK 초기화 성공 → ‘테스트 주문 생성 및 금액 설정’ 클릭 → 서버 주문번호·상품명·10,000 KRW·PENDING 및 ‘테스트 주문 조회 및 위젯 금액 설정 완료’ 표시를 확인하세요.
+
+페이지는 NODE_ENV=development와 서버 전용 활성화 플래그 true를 모두 요구합니다. 비활성화/운영 빌드에서는 404입니다. 기존 /dev/toss-sdk 경로는 유지합니다.
+
+POST /api/dev/toss-orders(본문 없음,201)로 생성한 뒤 GET /api/dev/toss-orders/{orderId}(200)로 조회하고 응답 전체가 일치하는지 검사합니다. 서버 금액만 widgets.setAmount({currency:'KRW',value:amount})에 전달합니다. 브라우저 임의 금액을 서버에 보내지 않습니다.
+
+생성/조회/응답 검증/SDK 금액 설정 중 하나라도 실패하면 준비 완료로 표시하지 않습니다. 즉시 클릭 잠금,20초 제한,네트워크 오류,언마운트 취소,공유 위젯 금액 변경 직렬화를 처리합니다. SDK가 응답하지 않으면 후속 금액 변경도 대기하며 완료로 처리하지 않습니다.
+
+테스트 주문은 메모리 최대1000건·30분 만료이며 서버 재시작 시 사라집니다. 실제 주문·회원 인증과 연결하지 않습니다. src/features/payments/dev-test-orders.ts가 향후 실제 주문 API로 교체할 테스트 전용 연결 지점입니다. 기존 장바구니/실제 주문 API는 수정하지 않았습니다.
+
+원격 초기 공통 apiRequest에는 상태 코드 확인 옵션이 없으므로 선택적 expectedStatus만 추가했습니다. 기존 호출에는 영향이 없으며 회원 전용 오류 처리는 포함하지 않았습니다.
+
+검증 명령은 pnpm run test:payments-sdk(초기화7+주문준비7), pnpm exec tsc --noEmit, pnpm build입니다. 실제 키 없는 환경에서 테스트와 운영 빌드를 진행하세요. 테스트/운영 브랜치 검증과 원본 로컬 브라우저 확인 결과를 구분해야 합니다.
+
+현재 완료 범위는 환경 준비·SDK 초기화·테스트 주문 조회 및 금액 설정까지입니다. 결제수단/약관 UI·requestPayment·성공/실패 페이지·결제 승인·취소·웹훅·결제 DB 저장은 구현 전입니다. 주문 준비/SDK 금액 설정 성공은 실제 토스 API 인증이나 결제 성공 검증이 아닙니다.

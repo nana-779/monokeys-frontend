@@ -1,8 +1,13 @@
 'use client'
 
 import { useTossWidgets } from './use-toss-widgets'
+import TestOrderCheck from './test-order-check'
 
-export default function SdkInitializationCheck() {
+export default function SdkInitializationCheck({
+  includeTestOrder = false,
+}: {
+  includeTestOrder?: boolean
+}) {
   const state = useTossWidgets()
   return (
     <section>
@@ -17,6 +22,7 @@ export default function SdkInitializationCheck() {
           다시 시도
         </button>
       )}
+      {includeTestOrder && state.status === 'ready' && <TestOrderCheck widgets={state.widgets} />}
     </section>
   )
 }

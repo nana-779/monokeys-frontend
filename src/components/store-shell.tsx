@@ -17,7 +17,7 @@ import {
   type ApiUser,
 } from "@/features/auth/api";
 import { useCart } from "@/features/cart/cart-provider";
-import { WithdrawalSessionContext } from '@/features/user/withdrawal-session';
+import { WithdrawalSessionContext } from "@/features/user/withdrawal-session";
 import { ApiRequestError } from "@/lib/api-client";
 
 type AppUser = ApiUser;
@@ -168,6 +168,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
             setAuthUser(null);
             setSessionVersion(v => v + 1);
             setAuthOpen(false);
+            setAuthError("");
+            closeCart();
             clearCart();
           },
         } : null}>

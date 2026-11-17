@@ -42,6 +42,7 @@ export async function createAdminProduct(
   if (image) body.append("image", image);
   const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
     method: "POST",
+    credentials: "include",
     body,
   });
 

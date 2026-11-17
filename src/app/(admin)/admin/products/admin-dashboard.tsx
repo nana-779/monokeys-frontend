@@ -1,6 +1,14 @@
-import { useRef, useState, type FormEvent } from "react";
-import { createAdminProduct } from "@/features/admin/api";
-import type { AdminProductInput } from "@/features/admin/api";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  createAdminProduct,
+  deleteAdminProduct,
+  getAdminProduct,
+  getAdminProducts,
+} from "@/features/admin/api";
+import type {
+  AdminProductInput,
+  AdminProductRecord,
+} from "@/features/admin/api";
 
 type View = "register" | "list" | "edit";
 type DialogType = "delete-all" | "delete-selected" | null;
@@ -29,8 +37,27 @@ const categories: { label: string; value: Exclude<CategoryValue, ""> }[] = [
   { label: "키캡", value: "keycaps" },
 ];
 
+function getProductCategoryValue(product?: AdminProductRecord): CategoryValue {
+  if (!product) return "";
+  const knownId = categories.find(
+    (category) => category.value === product.categoryId,
+  );
+  if (knownId) return knownId.value;
+  return (
+    categories.find((category) => category.label === product.categoryName)
+      ?.value ?? (product.categoryName === "기판 (PCB)" ? "pcb" : "")
+  );
+}
+
 const inputClass =
   "h-11 w-full rounded-lg border border-zinc-200 bg-white px-3.5 text-sm text-zinc-800 outline-none transition placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-800 focus:ring-3 focus:ring-zinc-800/10";
+
+function formatProductDate(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("ko-KR").format(date);
+}
 
 function Icon({
   name,
@@ -191,10 +218,12 @@ function FormSection({
 
 function ProductForm({
   mode,
+  initialProduct,
   onCancel,
   onComplete,
 }: {
   mode: "register" | "edit";
+  initialProduct?: AdminProductRecord;
   onCancel: () => void;
   onComplete: (message: string) => void;
 }) {
@@ -340,6 +369,7 @@ function ProductForm({
                 className={inputClass}
                 name="name"
                 placeholder="상품명을 입력해 주세요"
+                defaultValue={initialProduct?.name ?? ""}
                 required
               />
             </Field>
@@ -576,6 +606,7 @@ function ProductForm({
               min="0"
               name="stockQuantity"
               placeholder="0"
+              defaultValue={initialProduct?.stockQuantity ?? ""}
               required
               type="number"
             />
@@ -588,6 +619,20 @@ function ProductForm({
         title="상품 이미지"
         description="대표 이미지 파일을 선택하면 서버에 업로드되어 상품 썸네일로 저장됩니다."
       >
+        {mode === "edit" &&
+          initialProduct?.thumbnailUrl &&
+          images.length === 0 && (
+            <div className="mb-4">
+              <p className="mb-2 text-sm font-medium text-zinc-600">
+                현재 대표 이미지
+              </p>
+              <img
+                className="h-28 w-28 rounded-lg border border-zinc-200 object-cover"
+                src={initialProduct.thumbnailUrl}
+                alt={initialProduct.name}
+              />
+            </div>
+          )}
         <input
           ref={inputRef}
           className="hidden"
@@ -677,9 +722,21 @@ function ProductForm({
 }
 
 function ProductList({
+  products,
+  onEdit,
+  onDetail,
+  onDelete,
+  loading,
+  error,
   onDialog,
   onRegister,
 }: {
+  products: AdminProductRecord[];
+  onEdit: (product: AdminProductRecord) => void;
+  onDetail: (product: AdminProductRecord) => void;
+  onDelete: (product: AdminProductRecord) => void;
+  loading: boolean;
+  error: string;
   onDialog: (type: DialogType) => void;
   onRegister: () => void;
 }) {
@@ -733,7 +790,10 @@ function ProductList({
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-zinc-500">
-            <span className="font-semibold text-zinc-800">0</span>개 상품
+            <span className="font-semibold text-zinc-800">
+              {products.length}
+            </span>
+            개 상품
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -774,39 +834,120 @@ function ProductList({
               <th className="px-3 py-3.5">카테고리</th>
               <th className="px-3 py-3.5">판매가</th>
               <th className="px-3 py-3.5">재고</th>
-              <th className="px-3 py-3.5">브랜드 / 제조사</th>
               <th className="px-3 py-3.5">판매 상태</th>
               <th className="px-3 py-3.5">등록일</th>
               <th className="px-5 py-3.5 text-right">관리</th>
             </tr>
           </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr
+                key={product.productId}
+                className="border-b border-zinc-100 text-sm last:border-0"
+              >
+                <td className="px-5 py-3">
+                  <input
+                    aria-label={`${product.name} 선택`}
+                    className="h-4 w-4 rounded border-zinc-300 accent-zinc-900"
+                    type="checkbox"
+                  />
+                </td>
+                <td className="px-3 py-3">
+                  {product.thumbnailUrl ? (
+                    <img
+                      className="h-12 w-12 rounded-md object-cover"
+                      src={product.thumbnailUrl}
+                      alt={product.name}
+                    />
+                  ) : (
+                    <span className="text-xs text-zinc-400">이미지 없음</span>
+                  )}
+                </td>
+                <td className="px-3 py-3 font-semibold text-zinc-800">
+                  <button
+                    className="text-left hover:underline"
+                    type="button"
+                    onClick={() => onDetail(product)}
+                  >
+                    {product.name}
+                  </button>
+                </td>
+                <td className="px-3 py-3">{product.categoryName}</td>
+                <td className="px-3 py-3">
+                  {new Intl.NumberFormat("ko-KR").format(product.basePrice)}원
+                </td>
+                <td className="px-3 py-3">{product.stockQuantity}</td>
+                <td className="px-3 py-3">
+                  {product.active ? "판매 중" : "판매 중지"}
+                </td>
+                <td className="px-3 py-3">
+                  {formatProductDate(product.createdAt)}
+                </td>
+                <td className="px-5 py-3 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-semibold hover:bg-zinc-50"
+                      type="button"
+                      onClick={() => onEdit(product)}
+                    >
+                      수정
+                    </button>
+                    <button
+                      className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                      type="button"
+                      onClick={() => onDelete(product)}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
 
-      <div className="flex min-h-[380px] flex-col items-center justify-center px-6 py-16 text-center">
-        <div className="relative mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-50 text-zinc-400">
-          <Icon name="box" size={35} strokeWidth={1.4} />
-          <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border-4 border-white bg-zinc-900 text-white">
-            <Icon name="plus" size={13} strokeWidth={2.5} />
-          </span>
-        </div>
-        <h3 className="text-base font-bold text-zinc-800">
-          등록된 상품이 없습니다
-        </h3>
-        <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-400">
-          Spring Boot API에 상품을 연결하면 이곳에서 목록을 확인하고 관리할 수
-          있습니다.
-        </p>
-        <button
-          className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-950"
-          type="button"
-          onClick={onRegister}
+      {error ? (
+        <div
+          className="px-6 py-12 text-center text-sm text-red-600"
+          role="alert"
         >
-          <Icon name="plus" size={16} />첫 상품 등록하기
-        </button>
-      </div>
+          {error}
+        </div>
+      ) : loading ? (
+        <div className="px-6 py-12 text-center text-sm text-zinc-500">
+          상품 목록을 불러오는 중입니다.
+        </div>
+      ) : (
+        products.length === 0 && (
+          <div className="flex min-h-[380px] flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="relative mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-50 text-zinc-400">
+              <Icon name="box" size={35} strokeWidth={1.4} />
+              <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border-4 border-white bg-zinc-900 text-white">
+                <Icon name="plus" size={13} strokeWidth={2.5} />
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-zinc-800">
+              등록된 상품이 없습니다
+            </h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-400">
+              Spring Boot API에 상품을 연결하면 이곳에서 목록을 확인하고 관리할
+              수 있습니다.
+            </p>
+            <button
+              className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-950"
+              type="button"
+              onClick={onRegister}
+            >
+              <Icon name="plus" size={16} />첫 상품 등록하기
+            </button>
+          </div>
+        )
+      )}
       <div className="flex items-center justify-between border-t border-zinc-100 px-5 py-4 text-xs text-zinc-400">
-        <span>전체 0개 중 0개 표시</span>
+        <span>
+          전체 {products.length}개 중 {products.length}개 표시
+        </span>
         <div className="flex items-center gap-2">
           <button
             className="h-8 rounded-md border border-zinc-200 px-3"
@@ -822,6 +963,93 @@ function ProductList({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProductDetailDialog({
+  product,
+  onClose,
+}: {
+  product: AdminProductRecord;
+  onClose: () => void;
+}) {
+  const rows = [
+    ["카테고리", product.categoryName],
+    ["판매가", `${new Intl.NumberFormat("ko-KR").format(product.basePrice)}원`],
+    ["재고", String(product.stockQuantity)],
+    ["판매 상태", product.active ? "판매 중" : "판매 중지"],
+    ["등록일", formatProductDate(product.createdAt)],
+    ["상품 설명", product.description || "미입력"],
+    ["배열 규격", product.layout || "미입력"],
+    ["하우징 소재", product.housingMaterial || "미입력"],
+    ["기판 지원 핀", product.supportPins || "미입력"],
+    [
+      "무선 지원",
+      product.isWireless == null
+        ? "미입력"
+        : product.isWireless
+          ? "지원"
+          : "미지원",
+    ],
+    [
+      "스위치 핀 수",
+      product.switchPin == null ? "미입력" : `${product.switchPin}핀`,
+    ],
+    ["스위치 분류", product.switchType || "미입력"],
+    ["키캡 소재", product.keycapMaterial || "미입력"],
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 p-4"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section
+        aria-labelledby="product-detail-title"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+        role="dialog"
+      >
+        <div className="mb-5 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold text-zinc-400">
+              상품 상세 정보
+            </p>
+            <h2
+              id="product-detail-title"
+              className="mt-1 text-xl font-bold text-zinc-900"
+            >
+              {product.name}
+            </h2>
+          </div>
+          <button
+            aria-label="닫기"
+            className="rounded-lg px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100"
+            onClick={onClose}
+          >
+            닫기
+          </button>
+        </div>
+        {product.thumbnailUrl && (
+          <img
+            className="mb-5 h-40 w-40 rounded-xl border border-zinc-200 object-cover"
+            src={product.thumbnailUrl}
+            alt={product.name}
+          />
+        )}
+        <dl className="grid gap-x-8 sm:grid-cols-2">
+          {rows.map(([label, value]) => (
+            <div key={label} className="border-b border-zinc-100 py-3">
+              <dt className="text-xs font-medium text-zinc-400">{label}</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </div>
   );
 }
@@ -902,6 +1130,36 @@ export default function AdminDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogType>(null);
   const [toast, setToast] = useState("");
+  const [products, setProducts] = useState<AdminProductRecord[]>([]);
+  const [editingProduct, setEditingProduct] = useState<AdminProductRecord>();
+  const [detailProduct, setDetailProduct] = useState<AdminProductRecord>();
+  const [listError, setListError] = useState("");
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  useEffect(() => {
+    if (view !== "list") return;
+    let current = true;
+    setLoadingProducts(true);
+    setListError("");
+    getAdminProducts()
+      .then((items) => {
+        if (current) setProducts(items);
+      })
+      .catch((error: unknown) => {
+        if (current)
+          setListError(
+            error instanceof Error
+              ? error.message
+              : "상품 목록을 불러올 수 없습니다.",
+          );
+      })
+      .finally(() => {
+        if (current) setLoadingProducts(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [view]);
 
   const navigate = (next: View) => {
     setView(next);
@@ -912,6 +1170,36 @@ export default function AdminDashboard({
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 4200);
+  };
+
+  const completeForm = (message: string) => {
+    showToast(message);
+    if (view === "edit") navigate("list");
+  };
+
+  const showProductDetails = async (product: AdminProductRecord) => {
+    try {
+      setDetailProduct(await getAdminProduct(String(product.productId)));
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "상품 상세 정보를 불러올 수 없습니다.",
+      );
+    }
+  };
+
+  const deleteProduct = async (product: AdminProductRecord) => {
+    if (!window.confirm(`'${product.name}' 상품을 삭제하시겠습니까?`)) return;
+    try {
+      await deleteAdminProduct(String(product.productId));
+      setProducts(await getAdminProducts());
+      showToast("상품을 삭제 처리했습니다.");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "상품을 삭제할 수 없습니다.",
+      );
+    }
   };
 
   const pageTitle =
@@ -1067,6 +1355,16 @@ export default function AdminDashboard({
 
           {view === "list" ? (
             <ProductList
+              products={products}
+              loading={loadingProducts}
+              error={listError}
+              onEdit={(product) => {
+                setEditingProduct(product);
+                setView("edit");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              onDetail={showProductDetails}
+              onDelete={deleteProduct}
               onDialog={setDialog}
               onRegister={() => navigate("register")}
             />
@@ -1074,8 +1372,9 @@ export default function AdminDashboard({
             <ProductForm
               key={view}
               mode={view}
+              initialProduct={view === "edit" ? editingProduct : undefined}
               onCancel={() => navigate("list")}
-              onComplete={showToast}
+              onComplete={completeForm}
             />
           )}
         </main>
@@ -1083,6 +1382,12 @@ export default function AdminDashboard({
 
       {dialog && (
         <ConfirmDialog type={dialog} onClose={() => setDialog(null)} />
+      )}
+      {detailProduct && (
+        <ProductDetailDialog
+          product={detailProduct}
+          onClose={() => setDetailProduct(undefined)}
+        />
       )}
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-xl">

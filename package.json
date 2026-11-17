@@ -6,11 +6,19 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev --port 3000 --hostname 0.0.0.0",
     "local": "node scripts/local-dev.mjs",
+<<<<<<< HEAD
     "build": "cross-env NODE_OPTIONS=--no-deprecation next build",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "format": "oxfmt"
+=======
+    "build": "NODE_OPTIONS=--no-deprecation next build",
+    "start": "NODE_OPTIONS=--no-deprecation next start",
+    "format": "oxfmt",
+    "test:payments-sdk": "node scripts/test-payments-sdk.mjs"
+>>>>>>> feature/payment
   },
   "dependencies": {
+    "@tosspayments/tosspayments-sdk": "2.10.0",
     "html-react-parser": "^5.2.10",
     "next": "16.4.2",
     "react": "19.3.1",

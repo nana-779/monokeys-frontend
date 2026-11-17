@@ -4,15 +4,21 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useCart } from '@/features/cart/cart-provider'
 import { getCurrentUser } from '@/features/auth/api'
 import { formatPrice } from '@/lib/store-shared'
-import { OrderResponseData, submitOrderApi } from './api'
+import { submitOrderApi } from './api'
+import { useTossWidgets } from '@/features/payments/use-toss-widgets'
+import { renderPaymentWidgets } from '@/features/payments/order-widget-rendering'
+import { paymentErrorMessage } from '@/features/payments/payment-request'
 
 export function CheckoutForm() {
-  const { selectedItems, clearSelectedItems } = useCart()
+  const { selectedItems } = useCart()
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [completedOrder, setCompletedOrder] = useState<OrderResponseData | null>(null)
   const [userEmail, setUserEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [widgetReady, setWidgetReady] = useState(false)
+
+  const tossWidgetsState = useTossWidgets()
+  const { widgets } = tossWidgetsState
 
   useEffect(() => {
     getCurrentUser().then(({ user }) => {
@@ -22,6 +28,34 @@ export function CheckoutForm() {
 
   const subtotal = selectedItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0)
   const shipping = selectedItems.reduce((total, item) => total + item.shippingFee, 0)
+  const totalAmount = subtotal + shipping
+
+  useEffect(() => {
+    if (!widgets || totalAmount <= 0) return
+    let active = true
+
+    // 위젯에 결제 금액 설정
+    void widgets.setAmount({ currency: 'KRW', value: totalAmount })
+
+    const rendering = renderPaymentWidgets(widgets, {
+      payment: '#toss-payment-method',
+      agreement: '#toss-agreement',
+    })
+
+    rendering.ready.then(
+      () => {
+        if (active) setWidgetReady(true)
+      },
+      () => {
+        if (active) setWidgetReady(false)
+      },
+    )
+
+    return () => {
+      active = false
+      void rendering.dispose().catch(() => {})
+    }
+  }, [widgets, totalAmount])
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -34,10 +68,10 @@ export function CheckoutForm() {
     const formData = new FormData(form)
 
     const recipientName = String(formData.get('recipientName') || '').trim()
-    const phone = String(formData.get('phone') || '').trim()
+    const rawPhone = String(formData.get('phone') || '').trim()
     const email = String(formData.get('email') || userEmail || '').trim()
 
-    const cleanPhone = phone.replace(/[^0-9]/g, '')
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '')
     if (cleanPhone.length < 10) {
       setMessage('올바른 전화번호를 입력해 주세요. (10~11자리 숫자)')
       setIsSubmitting(false)
@@ -56,6 +90,7 @@ export function CheckoutForm() {
         quantity: item.quantity,
       }))
 
+      // 1. 백엔드에 PENDING(결제 대기) 상태로 주문서 생성
       const result = await submitOrderApi({
         ordererEmail: email,
         ordererName: recipientName,
@@ -63,52 +98,32 @@ export function CheckoutForm() {
         items,
       })
 
-      clearSelectedItems()
-      setCompletedOrder(result)
+      if (!widgets || !widgetReady) {
+        setMessage('결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.')
+        setIsSubmitting(false)
+        return
+      }
+
+      // 2. 토스페이먼츠 결제 요청 (결제 완료 시 successUrl, 실패/취소 시 failUrl로 이동)
+      const firstItemName = selectedItems[0]?.name || '주문 상품'
+      const orderName =
+        selectedItems.length > 1
+          ? `${firstItemName} 외 ${selectedItems.length - 1}건`
+          : firstItemName
+
+      await widgets.requestPayment({
+        orderId: result.orderNumber,
+        orderName,
+        customerEmail: email,
+        customerName: recipientName,
+        successUrl: `${window.location.origin}/checkout/success`,
+        failUrl: `${window.location.origin}/checkout/fail`,
+      })
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : '주문 처리 중 오류가 발생했습니다.')
+      setMessage(paymentErrorMessage(err))
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  if (completedOrder) {
-    return (
-      <div className="mx-auto max-w-2xl rounded-2xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 text-white">
-          <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <p className="mb-2 text-xs font-semibold tracking-[0.2em] text-zinc-500">ORDER CONFIRMATION</p>
-        <h1 className="mb-4 text-4xl font-medium tracking-[-0.04em]">Thank you for your order!</h1>
-        <p className="mb-8 text-sm text-zinc-600">
-          주문이 정상적으로 접수되었습니다. (주문번호: <strong>{completedOrder.orderNumber}</strong>)
-        </p>
-
-        <div className="mb-8 divide-y divide-zinc-200 rounded-xl bg-zinc-50 p-6 text-left text-sm">
-          <div className="flex justify-between py-2">
-            <span className="text-zinc-500">주문 상태</span>
-            <span className="font-semibold text-emerald-600">{completedOrder.orderStatus}</span>
-          </div>
-          <div className="flex justify-between py-2">
-            <span className="text-zinc-500">주문자 이메일</span>
-            <span className="font-medium">{completedOrder.ordererEmail}</span>
-          </div>
-          <div className="flex justify-between py-2">
-            <span className="text-zinc-500">최종 결제 금액</span>
-            <strong className="text-base text-zinc-950">{formatPrice(completedOrder.finalPayAmount)}</strong>
-          </div>
-        </div>
-
-        <a
-          href="/products"
-          className="inline-flex h-14 w-full items-center justify-center rounded-md bg-black text-sm font-semibold text-white transition hover:bg-zinc-800"
-        >
-          CONTINUE SHOPPING
-        </a>
-      </div>
-    )
   }
 
   return (
@@ -158,7 +173,18 @@ export function CheckoutForm() {
             />
           </label>
         </div>
+
+        {/* 토스페이먼츠 결제 위젯 영역 */}
+        <div className="mt-10 rounded-xl border border-zinc-200 p-6">
+          <h2 className="mb-4 text-lg font-medium">결제 수단 선택</h2>
+          {tossWidgetsState.status === 'error' && (
+            <p className="mb-4 text-sm text-red-600">{tossWidgetsState.message}</p>
+          )}
+          <div id="toss-payment-method" />
+          <div id="toss-agreement" />
+        </div>
       </div>
+
       <aside className="h-fit rounded-xl bg-zinc-100 p-7 lg:sticky lg:top-28">
         <h2 className="text-xl font-medium tracking-[-0.03em]">Order summary</h2>
         <div className="my-6 divide-y divide-zinc-200 border-y border-zinc-200">
@@ -193,7 +219,7 @@ export function CheckoutForm() {
           </div>
           <div className="flex justify-between border-t border-zinc-300 pt-4 text-lg">
             <dt>Total</dt>
-            <dd className="font-semibold">{formatPrice(subtotal + shipping)}</dd>
+            <dd className="font-semibold">{formatPrice(totalAmount)}</dd>
           </div>
         </dl>
         {message && (
@@ -203,10 +229,10 @@ export function CheckoutForm() {
         )}
         <button
           className="mt-7 h-14 w-full rounded-md bg-black text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-30"
-          disabled={!selectedItems.length || isSubmitting}
+          disabled={!selectedItems.length || isSubmitting || !widgetReady}
           type="submit"
         >
-          {isSubmitting ? 'PROCESSING...' : 'PLACE ORDER'}
+          {isSubmitting ? 'PROCESSING...' : `${formatPrice(totalAmount)} 결제하기`}
         </button>
       </aside>
     </form>

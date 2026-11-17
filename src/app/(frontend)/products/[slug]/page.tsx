@@ -1,13 +1,18 @@
-import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { AddToCart } from '@/features/products/add-to-cart'
-import { getPreviewProduct } from '@/features/products/preview-data'
-import { formatPrice, mediaFrom } from '@/lib/store-shared'
+import { getProductById } from '@/features/products/api'
+import { formatPrice, mediaFrom, productCategoryLabels } from '@/lib/store-shared'
+import { ProductImage } from '@/components/common/product-image'
+import type { StoreProduct } from '@/lib/store-shared'
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const product = getPreviewProduct(slug)
-  if (!product) notFound()
+  let product: StoreProduct
+  try {
+    product = await getProductById(slug)
+  } catch {
+    notFound()
+  }
   const images = product.images.map(mediaFrom).filter((image) => image?.url)
   const primaryImage = images[0]
 
@@ -16,16 +21,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       <div className="grid grid-cols-[1.25fr_.75fr] gap-16 max-lg:grid-cols-1">
         <div>
           <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
-            {primaryImage?.url && (
-              <Image
-                alt={primaryImage.alt || product.name}
-                className="object-cover grayscale"
-                fill
-                priority
-                sizes="(max-width: 1024px) 92vw, 50vw"
-                src={primaryImage.url}
-              />
-            )}
+            <ProductImage
+              alt={primaryImage?.alt || product.name}
+              className="absolute inset-0 h-full w-full object-cover grayscale"
+              src={primaryImage?.url}
+            />
           </div>
           {images.length > 1 && (
             <div className="mt-3 grid grid-cols-4 gap-3">
@@ -34,12 +34,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   className="relative aspect-square overflow-hidden rounded-md bg-zinc-100"
                   key={image!.id}
                 >
-                  <Image
+                  <ProductImage
                     alt={image!.alt || product.name}
-                    className="object-cover grayscale"
-                    fill
-                    sizes="15vw"
-                    src={image!.url!}
+                    className="absolute inset-0 h-full w-full object-cover grayscale"
+                    src={image!.url}
                   />
                 </div>
               ))}
@@ -48,7 +46,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </div>
         <div className="lg:sticky lg:top-28 lg:self-start">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            {product.brand} / {product.category.replace('-', ' ')}
+            {product.brand} / {productCategoryLabels[product.category]}
           </p>
           <h1 className="mt-5 text-5xl font-medium leading-none tracking-[-0.06em]">
             {product.name}

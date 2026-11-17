@@ -1,5 +1,7 @@
+import { resolveProductCategory, type StoreProduct } from "@/lib/store-shared";
 import { API_BASE_URL } from "@/lib/api-client";
 
+// TODO(담당 5): 관리자 상품 목록, 수정, 삭제 API를 구현합니다.
 type ApiResponse<T> = {
   success: boolean;
   message: string | null;
@@ -68,19 +70,44 @@ export async function createAdminProduct(
     new Blob([JSON.stringify(input)], { type: "application/json" }),
   );
   if (image) body.append("image", image);
-  const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
-    method: "POST",
-    body,
-    credentials: "include",
-  });
-  const result = (await response.json()) as ApiResponse<{ productId: number }>;
-  if (!response.ok || !result.success || result.data == null) {
-    throw new Error(result.message || "상품을 등록할 수 없습니다");
+  const response = await fetch(
+    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      body,
+    },
+  );
+  const result = (await response.json()) as ApiResponse<{
+    productId: number;
+    categoryName: string;
+    categoryId?: string;
+    name: string;
+    basePrice: number;
+    stockQuantity: number;
+    thumbnailUrl: string | null;
+    description: string | null;
+  }>;
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.message || "상품을 수정할 수 없습니다");
   }
-  return result.data.productId;
+  const item = result.data;
+  return {
+    id: item.productId,
+    slug: String(item.productId),
+    name: item.name,
+    basePrice: item.basePrice,
+    category: resolveProductCategory(item.categoryId, item.categoryName),
+    description: item.description ?? "",
+    stockQuantity: item.stockQuantity,
+    shippingFee: 0,
+    brand: "",
+    images: item.thumbnailUrl
+      ? [{ id: item.productId, url: item.thumbnailUrl, alt: item.name }]
+      : [],
+  };
 }
 
-// 관리자 상품 삭제
 export async function deleteAdminProduct(productId: string): Promise<void> {
   const response = await fetch(
     `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,

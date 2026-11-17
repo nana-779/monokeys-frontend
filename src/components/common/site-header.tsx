@@ -13,8 +13,8 @@ const categories = [
     children: ["알루미늄", "폴리카보네이트", "목재"],
   },
   {
-    label: "KEYBOARDS",
-    href: "/products?category=keyboards",
+    label: "PCB",
+    href: "/products?category=pcb",
     children: ["65%", "75%", "텐키리스"],
   },
   {

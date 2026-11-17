@@ -230,24 +230,18 @@ function ProductForm({
   const [images, setImages] = useState<
     { name: string; url: string; file: File }[]
   >([]);
-  const [price, setPrice] = useState(
-    initialProduct
-      ? new Intl.NumberFormat("ko-KR").format(initialProduct.basePrice)
-      : "",
-  );
-  const [selectedCategory, setSelectedCategory] = useState<CategoryValue>(
-    getProductCategoryValue(initialProduct),
-  );
+  const [price, setPrice] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<CategoryValue>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [spec, setSpec] = useState({
-    layout: initialProduct?.layout ?? null,
-    housingMaterial: initialProduct?.housingMaterial ?? null,
-    supportPins: initialProduct?.supportPins ?? null,
-    isWireless: initialProduct?.isWireless ?? null,
-    switchPin: initialProduct?.switchPin?.toString() ?? null,
-    switchType: initialProduct?.switchType ?? null,
-    keycapMaterial: initialProduct?.keycapMaterial ?? null,
+    layout: null as string | null,
+    housingMaterial: null as string | null,
+    supportPins: null as string | null,
+    isWireless: null as boolean | null,
+    switchPin: null as string | null,
+    switchType: null as string | null,
+    keycapMaterial: null as string | null,
   });
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -284,12 +278,12 @@ function ProductForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const form = event.currentTarget;
     if (mode === "edit") {
-      setError("상품 수정 기능은 현재 잠시 비활성화되어 있습니다.");
+      setError("상품 수정 API는 아직 연결되지 않았습니다.");
       return;
     }
+
+    const form = event.currentTarget;
     const formData = new FormData(form);
     const categoryValue = String(formData.get("categoryName") ?? "");
     const categoryName = categories.find(
@@ -334,8 +328,7 @@ function ProductForm({
     setError("");
     setSubmitting(true);
     try {
-      const image = images[0]?.file;
-      const productId = await createAdminProduct(input, image);
+      const productId = await createAdminProduct(input, images[0]?.file);
       onComplete(`상품이 정상적으로 등록되었습니다. 상품 번호: ${productId}`);
       form.reset();
       setPrice("");
@@ -374,6 +367,7 @@ function ProductForm({
             <Field label="상품명" required>
               <input
                 className={inputClass}
+                name="name"
                 placeholder="상품명을 입력해 주세요"
                 defaultValue={initialProduct?.name ?? ""}
                 required
@@ -415,19 +409,13 @@ function ProductForm({
               </span>
             </div>
           </Field>
-          <Field label="브랜드 / 제조사">
-            <input
-              className={inputClass}
-              placeholder="브랜드 또는 제조사를 입력해 주세요"
-            />
-          </Field>
           <div className="md:col-span-2">
-            <Field label="상품 설명" hint="권장 입력 분량: 200~1,500자">
+            <Field label="상품 설명" hint="300자 이내로 입력해주세요">
               <textarea
+                maxLength={300}
                 className={`${inputClass} min-h-32 resize-y py-3`}
                 name="description"
                 placeholder="상품 설명을 입력해 주세요"
-                defaultValue={initialProduct?.description ?? ""}
               />
             </Field>
           </div>
@@ -589,7 +577,7 @@ function ProductForm({
       <FormSection
         number="03"
         title="가격 및 재고"
-        description="판매 가격, 재고, 배송 정보를 설정해 주세요."
+        description="판매 가격과 재고 수량을 입력해 주세요."
       >
         <div className="grid gap-5 md:grid-cols-2">
           <Field label="판매 가격" required>
@@ -600,6 +588,7 @@ function ProductForm({
               <input
                 className={`${inputClass} pl-8`}
                 inputMode="numeric"
+                name="basePrice"
                 placeholder="0"
                 required
                 value={price}
@@ -615,42 +604,20 @@ function ProductForm({
             <input
               className={inputClass}
               min="0"
+              name="stockQuantity"
               placeholder="0"
               defaultValue={initialProduct?.stockQuantity ?? ""}
               required
               type="number"
             />
           </Field>
-          <Field label="배송비" hint="무료 배송은 0을 입력해 주세요.">
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-500">
-                ₩
-              </span>
-              <input
-                className={`${inputClass} pl-8`}
-                inputMode="numeric"
-                placeholder="0"
-                defaultValue="0"
-              />
-            </div>
-          </Field>
-          <Field label="KC 인증번호">
-            <input
-              className={inputClass}
-              placeholder="인증번호를 입력해 주세요"
-            />
-          </Field>
         </div>
       </FormSection>
 
       <FormSection
-        number="03"
+        number="04"
         title="상품 이미지"
-        description={
-          mode === "edit"
-            ? "새 이미지를 선택하면 현재 대표 이미지를 교체합니다."
-            : "대표 이미지 파일을 선택하면 서버에 업로드되어 상품 썸네일로 저장됩니다."
-        }
+        description="대표 이미지 파일을 선택하면 서버에 업로드되어 상품 썸네일로 저장됩니다."
       >
         {mode === "edit" &&
           initialProduct?.thumbnailUrl &&
@@ -670,8 +637,7 @@ function ProductForm({
           ref={inputRef}
           className="hidden"
           type="file"
-          accept="image/*"
-          multiple
+          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
           onChange={(event) => handleImages(event.target.files)}
         />
         <button
@@ -694,7 +660,7 @@ function ProductForm({
             </span>
           </span>
           <span className="mt-1.5 text-xs text-zinc-400">
-            PNG, JPG, WEBP · 여러 파일 선택 가능
+            JPG, PNG, WEBP · 최대 5MB · 대표 썸네일 이미지 1개
           </span>
         </button>
         {images.length > 0 && (
@@ -740,6 +706,7 @@ function ProductForm({
         )}
         <button
           className="inline-flex h-11 items-center gap-2 rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(0,0,0,0.1)] transition hover:bg-zinc-950 active:translate-y-px"
+          disabled={submitting}
           type="submit"
         >
           <Icon name="check" size={17} />
@@ -1158,6 +1125,7 @@ export default function AdminDashboard({
 }: {
   previewMode?: boolean;
 }) {
+  // TODO(담당 5): 상품 목록, 수정, 삭제 API와 관리자 권한 확인을 연결합니다.
   const [view, setView] = useState<View>("register");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogType>(null);

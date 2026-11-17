@@ -27,6 +27,7 @@ const providerCodes = new Set([
 const methods = new Set(['카드', '가상계좌', '간편결제', '휴대폰', '계좌이체', '문화상품권', '도서문화상품권', '게임문화상품권'])
 
 export class ConfirmationError extends Error {
+  // 화면에 필요한 오류 종류만 보관하며 서버나 토스가 보낸 원문 메시지를 오류 내용으로 복사하지 않습니다.
   constructor(public readonly kind: ConfirmationFailure, public readonly status = 0,
     public readonly code?: string, public readonly providerCode?: string) {
     super('결제 승인 응답을 확인하지 못했습니다.')
@@ -35,17 +36,19 @@ export class ConfirmationError extends Error {
 }
 
 type JsonObject = Record<string, unknown>
+// 응답을 검사하기 전에 배열이나 빈 값이 아닌 객체인지 확인합니다.
 function object(value: unknown): value is JsonObject {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
+// 서버에 보낼 결제 키·개발 주문번호·정수 금액을 검사하여 명백히 잘못된 승인 요청은 보내지 않습니다.
 export function validApprovalRequest(request: ApprovalRequest): boolean {
   return !!request && typeof request.paymentKey === 'string' && /^[\x21-\x7e]{1,200}$/.test(request.paymentKey)
     && typeof request.orderId === 'string' && /^dev_[a-f0-9]{32}$/.test(request.orderId)
     && Number.isSafeInteger(request.amount) && request.amount > 0
 }
 
-/** Validate the actual backend HTTP/envelope/DTO together; return only whitelisted display data. */
+// 응답 상태 코드와 본문이 함께 맞아야 승인 결과를 인정합니다. 주문·금액이 일치하는 완료 상태만 결제 완료로 표시할 수 있습니다.
 export function readConfirmationResponse(status: number, body: unknown, request: ApprovalRequest): ConfirmationResponse {
   if (status !== 200 && status !== 202) {
     const data = object(body) && body.success === false && object(body.data) ? body.data : null
@@ -60,7 +63,7 @@ export function readConfirmationResponse(status: number, body: unknown, request:
     else if (code === 'PAYMENT_REJECTED' || code === 'PAYMENT_STATE_CONFLICT') kind = 'rejected'
     else if (code === 'PAYMENT_CONFIRM_FORBIDDEN' || code === 'PAYMENT_PROVIDER_CONFIGURATION_ERROR'
       || code === 'PAYMENT_CONFIRM_CAPACITY_EXCEEDED') kind = 'configuration'
-    // Never copy server/provider messages, field values or arbitrary error codes into an Error.
+    // 서버·외부 결제사의 메시지나 입력값, 임의의 오류 코드를 오류 객체에 복사하지 않습니다.
     throw new ConfirmationError(kind, status, code, provider)
   }
   if (!object(body) || body.success !== true || !object(body.data)) throw new ConfirmationError('unknown', status)
@@ -70,6 +73,7 @@ export function readConfirmationResponse(status: number, body: unknown, request:
     throw new ConfirmationError('unknown', status)
   const paymentStatus = data.paymentStatus
   let method: string | null = null, approvedAt: string | null = null
+  // HTTP 성공만으로 완료를 판단하지 않고 결제 상태, 완료 표시, 결제수단과 승인 시각도 확인합니다.
   if (status === 200 && paymentStatus === 'DONE' && data.completed === true) {
     if (typeof data.method !== 'string' || !methods.has(data.method)
       || typeof data.approvedAt !== 'string'
@@ -90,7 +94,8 @@ export type ConfirmationTransport = (url: string, init: RequestInit) => Promise<
   status: number; json: () => Promise<unknown>
 }>
 
-/** Feature-only adapter: shared auth/API error semantics are intentionally left unchanged. */
+/** 결제 기능 전용 통신 어댑터이며 공통 인증 API의 오류 처리 방식은 유지합니다. */
+// 쿠키를 포함한 JSON 요청으로 백엔드 승인 API를 호출합니다. 네트워크 오류는 승인 실패의 증거가 아니므로 미확정으로 분류합니다.
 export function createPaymentConfirmationClient(baseUrl: string, transport: ConfirmationTransport) {
   return async (request: ApprovalRequest, signal: AbortSignal): Promise<ConfirmationResponse> => {
     if (!validApprovalRequest(request)) throw new ConfirmationError('request')

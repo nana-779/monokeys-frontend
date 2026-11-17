@@ -3,17 +3,20 @@ import { validateDevOrder, type DevTestOrder } from './test-order-preparation'
 export const PAYMENT_ATTEMPT_KEY = 'toss-dev-payment-attempt'
 export const PAYMENT_RESULT_REVIEW_KEY = 'toss-dev-payment-review'
 export type ApprovalRequest = Readonly<{ paymentKey: string; orderId: string; amount: number }>
-// The concrete development connector validates the backend's HTTP/envelope/DTO before returning.
+// 실제 개발용 통신 어댑터는 상태 코드와 공통 응답 구조를 검사한 뒤 결과를 돌려줍니다.
 export type ApprovalConnector = (request: ApprovalRequest, signal: AbortSignal) => Promise<unknown>
 export class ResultValidationError extends Error {
+  // 검증에 실패한 입력값이나 결제 키를 예외에 넣지 않고 고정된 안내만 전달합니다.
   constructor() { super('결과 필수값·주문번호·금액을 확인해 주세요.') }
 }
+// 같은 필수 항목이 여러 번 오거나 비어 있으면 어느 값을 믿을지 결정하지 않고 콜백을 거부합니다.
 function single(params: URLSearchParams, key: string, optional = false) {
   const values = params.getAll(key)
   if (optional && values.length === 0) return undefined
   if (values.length !== 1 || !values[0]?.trim()) throw new ResultValidationError()
   return values[0]
 }
+// 주소의 결제 키·주문번호·금액을 검사하고 요청 당시 주문과 대조합니다. 주소에 성공 값이 있어도 승인 완료로 간주하지 않습니다.
 export function validateSuccess(params: URLSearchParams, attempt: string | null): {
   order: DevTestOrder; approval: ApprovalRequest
 } {
@@ -27,11 +30,12 @@ export function validateSuccess(params: URLSearchParams, attempt: string | null)
     return { order, approval: { paymentKey, orderId, amount: order.amount } }
   } catch { throw new ResultValidationError() }
 }
-// Preserve stage-5 callers: public display data never contains paymentKey.
+// 결제 키를 화면용 주문 데이터에서 제외한 채 검증된 주문 정보만 반환합니다.
 export function readSuccess(params: URLSearchParams, attempt: string | null): DevTestOrder {
   return validateSuccess(params, attempt).order
 }
 export type FailureCategory = 'cancelled' | 'card-rejected' | 'failed' | 'system-error'
+// 실패 주소의 값은 검증하고, 알려진 코드만 안전한 안내로 바꿉니다. 미확인 오류를 확정 실패로 단정하지 않습니다.
 export function readFailure(params: URLSearchParams) {
   const rawCode = single(params, 'code')!
   if (!/^[A-Z0-9_]{1,100}$/.test(rawCode)) throw new ResultValidationError()
@@ -53,6 +57,6 @@ export function readFailure(params: URLSearchParams) {
   } else {
     category = 'failed'; message = '결제 인증이 실패했습니다. 테스트 주문을 다시 준비해 주세요.'
   }
-  // Validate but never echo the external raw message or infer an undocumented cause.
+  // 외부 메시지는 형식만 검사하며 화면에 그대로 표시하거나 문서에 없는 원인을 추정하지 않습니다.
   return { code, category, message }
 }

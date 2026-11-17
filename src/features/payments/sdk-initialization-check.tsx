@@ -3,6 +3,7 @@
 import { useTossWidgets } from './use-toss-widgets'
 import TestOrderCheck from './test-order-check'
 
+// 초기화 상태와 재시도 버튼을 표시하며, 위젯 준비가 끝난 경우에만 개발 주문 화면을 엽니다.
 export default function SdkInitializationCheck({
   includeTestOrder = false,
 }: {

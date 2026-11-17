@@ -5,7 +5,7 @@ import { prepareTestOrder, type DevTestOrder } from './test-order-preparation'
 import { createPaymentRequester, type PaymentRequest } from './payment-request'
 import { createPaymentConfirmationClient } from './payment-confirmation'
 import { createResultFlow, resultHeading } from './payment-result-flow'
-import { mountOrderWidgets } from './order-widget-rendering'
+import { renderPaymentWidgets } from './order-widget-rendering'
 
 type Case = { scenario: string; created: { data: DevTestOrder }; lookup: { data: DevTestOrder }
   request: { paymentKey: string; orderId: string; amount: number }; responses: { status: number; body: unknown }[] }
@@ -24,7 +24,7 @@ for (const fixture of contract.cases) test('Spring controller -> frontend comple
   const order = await prepareTestOrder(widgets, { create: async () => fixture.created.data,
     find: async () => fixture.lookup.data }, new AbortController().signal)
   assert.deepEqual(amounts, [{ currency: 'KRW', value: order.amount }])
-  const mounted = mountOrderWidgets(widgets, { payment: '#methods', agreement: '#terms' }); await mounted.ready
+  const mounted = renderPaymentWidgets(widgets, { payment: '#methods', agreement: '#terms' }); await mounted.ready
   assert.deepEqual(renders, ['#methods', '#terms'])
   const request = createPaymentRequester({ find: async () => fixture.lookup.data,
     remember: value => { attempt = JSON.stringify(value) }, request: async value => { sdk.push(value) } })

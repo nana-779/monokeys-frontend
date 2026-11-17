@@ -6,6 +6,7 @@ export type InitializationCode =
   | 'TIMEOUT'
 
 export class WidgetsInitializationError extends Error {
+  // 초기화 실패 원인을 화면에서 구분할 수 있도록 안전한 오류 코드와 안내문을 묶습니다.
   constructor(
     public readonly code: InitializationCode,
     message: string,
@@ -34,8 +35,10 @@ export function createWidgetsInitializer<T>(options: InitializerOptions<T>): () 
         new WidgetsInitializationError('CLIENT_ONLY', '브라우저에서만 초기화할 수 있습니다.'),
       )
     }
+    // 진행 중이거나 이미 완료된 초기화 결과를 재사용하여 SDK를 중복 생성하지 않습니다.
     if (cached) return cached
 
+    // 위젯을 만들기 전에 테스트용 주문서형 키인지 검사합니다. 이 형식 검사만으로 백엔드 키와 같은 상점임을 증명하지는 않습니다.
     const clientKey = options.readClientKey()
     if (!clientKey) {
       return Promise.reject(
@@ -54,6 +57,7 @@ export function createWidgetsInitializer<T>(options: InitializerOptions<T>): () 
       )
     }
 
+    // 초기화가 끝나지 않는 경우를 시간 제한으로 처리하고, 늦게 도착한 성공 응답이 실패 상태를 덮어쓰지 못하게 합니다.
     cached = new Promise<T>((resolve, reject) => {
       let settled = false
       const timer = setTimeout(() => {
@@ -67,6 +71,7 @@ export function createWidgetsInitializer<T>(options: InitializerOptions<T>): () 
         )
       }, options.timeoutMs ?? 20_000)
 
+      // 외부 오류 원문 대신 고정된 안내를 반환하여 키나 내부 설정이 노출되지 않게 합니다.
       function fail() {
         if (settled) return
         settled = true

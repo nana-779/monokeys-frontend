@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mountOrderWidgets, OrderWidgetRenderingError } from './order-widget-rendering'
+import { renderPaymentWidgets, OrderWidgetRenderingError } from './order-widget-rendering'
 
 const selectors = { payment: '#payment', agreement: '#agreement' }
 test('renders official methods and agreement and disposes both exactly once', async () => {
   const calls: string[] = []
-  const mounted = mountOrderWidgets({
+  const mounted = renderPaymentWidgets({
     renderPaymentMethods: async ({ selector }) => {
       calls.push(selector)
       return { destroy: async () => { calls.push('payment destroyed') } }
@@ -26,9 +26,9 @@ test('Strict Mode cleanup before rendering creates no stale widgets', async () =
     renderPaymentMethods: async () => { renders++; return { destroy: async () => {} } },
     renderAgreement: async () => { renders++; return { destroy: async () => {} } },
   }
-  const stale = mountOrderWidgets(widgets, selectors)
+  const stale = renderPaymentWidgets(widgets, selectors)
   const disposal = stale.dispose()
-  const current = mountOrderWidgets(widgets, selectors)
+  const current = renderPaymentWidgets(widgets, selectors)
   await Promise.all([stale.ready, disposal, current.ready])
   assert.equal(renders, 2)
   await current.dispose()
@@ -50,10 +50,10 @@ test('late render is destroyed before a replacement mounts', async () => {
     },
     renderAgreement: async () => ({ destroy: async () => {} }),
   }
-  const stale = mountOrderWidgets(widgets, selectors)
+  const stale = renderPaymentWidgets(widgets, selectors)
   await begun
   const disposal = stale.dispose()
-  const current = mountOrderWidgets(widgets, selectors)
+  const current = renderPaymentWidgets(widgets, selectors)
   finish()
   await Promise.all([stale.ready, disposal, current.ready])
   assert.deepEqual(calls, ['start 1', 'destroy 1', 'start 2'])
@@ -74,7 +74,7 @@ for (const stage of ['payment', 'agreement'] as const) {
         return { destroy: async () => { destroyed++ } }
       },
     }
-    const first = mountOrderWidgets(widgets, selectors)
+    const first = renderPaymentWidgets(widgets, selectors)
     await assert.rejects(first.ready, (error: unknown) => {
       assert.ok(error instanceof OrderWidgetRenderingError)
       assert.equal(error.stage, stage)
@@ -84,7 +84,7 @@ for (const stage of ['payment', 'agreement'] as const) {
     assert.equal(destroyed, stage === 'agreement' ? 1 : 0)
     await first.dispose()
     failing = false
-    const second = mountOrderWidgets(widgets, selectors)
+    const second = renderPaymentWidgets(widgets, selectors)
     await second.ready
     await second.dispose()
   })
@@ -99,10 +99,10 @@ test('failed destroy blocks duplicate rendering until a page reload', async () =
     },
     renderAgreement: async () => ({ destroy: async () => {} }),
   }
-  const first = mountOrderWidgets(widgets, selectors)
+  const first = renderPaymentWidgets(widgets, selectors)
   await first.ready
   await assert.rejects(first.dispose(), { stage: 'cleanup' })
-  const second = mountOrderWidgets(widgets, selectors)
+  const second = renderPaymentWidgets(widgets, selectors)
   await assert.rejects(second.ready, { stage: 'cleanup' })
   assert.equal(renders, 1)
   await second.dispose()

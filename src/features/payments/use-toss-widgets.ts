@@ -10,6 +10,7 @@ type WidgetsState =
   | { status: 'ready'; widgets: TossPaymentsWidgets; message: null }
   | { status: 'error'; widgets: null; message: string }
 
+// 공유 SDK 초기화 결과를 화면 상태로 바꾸는 훅입니다. 화면이 사라진 뒤에는 이전 비동기 응답으로 상태를 갱신하지 않습니다.
 export function useTossWidgets() {
   const [state, setState] = useState<WidgetsState>({
     status: 'loading',
@@ -39,6 +40,7 @@ export function useTossWidgets() {
     }
   }, [attempt])
 
+  // 사용자가 재시도를 선택하면 로딩 상태로 되돌리고 초기화 흐름을 다시 시작합니다.
   const retry = useCallback(() => {
     setState({ status: 'loading', widgets: null, message: null })
     setAttempt((value) => value + 1)

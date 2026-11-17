@@ -30,6 +30,7 @@ export type AdminProductRecord = Omit<AdminProductInput, "thumbnailUrl"> & {
   createdAt: string;
 };
 
+// 관리자 상품 전체 조회
 export async function getAdminProducts(): Promise<AdminProductRecord[]> {
   const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
     credentials: "include",
@@ -41,6 +42,7 @@ export async function getAdminProducts(): Promise<AdminProductRecord[]> {
   return result.data;
 }
 
+// 관리자 상품 상세 조회
 export async function getAdminProduct(
   productId: string,
 ): Promise<AdminProductRecord> {
@@ -55,6 +57,7 @@ export async function getAdminProduct(
   return result.data;
 }
 
+// 관리자 상품 등록
 export async function createAdminProduct(
   input: AdminProductInput,
   image?: File,
@@ -77,6 +80,7 @@ export async function createAdminProduct(
   return result.data.productId;
 }
 
+// 관리자 상품 삭제
 export async function deleteAdminProduct(productId: string): Promise<void> {
   const response = await fetch(
     `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,

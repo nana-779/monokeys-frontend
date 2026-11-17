@@ -130,7 +130,7 @@ export async function updateAdminProduct(
 
   const response = await fetch(
     `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
-    { method: 'PATCH', body },
+    { method: 'PATCH', body, credentials: 'include' },
   )
   return toAdminProduct(await readResponse<ProductResponse>(response))
 }

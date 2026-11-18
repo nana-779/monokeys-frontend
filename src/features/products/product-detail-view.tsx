@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { CloseIcon, MinusIcon, PlusIcon } from '@/components/icons'
 import { useCart } from '@/features/cart/cart-provider'
+import { CustomKeycapEditorView } from '@/features/products/custom-keycap-editor-view'
 import { ProductDetailStory } from '@/features/products/product-detail-story'
 import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
 
@@ -12,6 +13,14 @@ interface ProductDetailViewProps {
 }
 
 export function ProductDetailView({ product }: ProductDetailViewProps) {
+  if (product.categoryId === 'keycap-custom') {
+    return <CustomKeycapEditorView product={product} />
+  }
+
+  return <StandardProductDetailView product={product} />
+}
+
+function StandardProductDetailView({ product }: ProductDetailViewProps) {
   const { addItem } = useCart()
 
   // 갤러리 이미지 세트 (images 우선, 비어 있을 경우 galleryImages fallback)

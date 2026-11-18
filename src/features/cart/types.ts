@@ -11,4 +11,5 @@ export type CartItem = {
   manualBuildId?: number
   autoBuildId?: number
   buildType?: 'MANUAL' | 'AUTO'
+  customDesignData?: string
 }

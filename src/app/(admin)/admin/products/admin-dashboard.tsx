@@ -737,6 +737,7 @@ function EditProductForm({
   const [name, setName] = useState(product.name);
   const [price, setPrice] = useState(String(product.basePrice));
   const [stock, setStock] = useState(String(product.stockQuantity));
+  const [active, setActive] = useState(product.active);
   const [description, setDescription] = useState(product.description ?? "");
   const [spec, setSpec] = useState({
     layout: product.layout ?? "",
@@ -806,6 +807,7 @@ function EditProductForm({
       name: name.trim(),
       basePrice,
       stockQuantity,
+      active,
       description,
       layout: spec.layout || null,
       housingMaterial: spec.housingMaterial || null,
@@ -898,8 +900,7 @@ function EditProductForm({
         description="현재 카테고리에 연결된 스펙을 수정합니다. 백엔드 PATCH는 빈 스펙값을 기존 값 유지로 처리합니다."
       >
         <div className="grid gap-5 md:grid-cols-2">
-          {(categoryValue === "housing" ||
-            categoryValue === "pcb") && (
+          {(categoryValue === "housing" || categoryValue === "pcb") && (
             <Field label="배열 규격">
               <select
                 className={inputClass}
@@ -1086,6 +1087,39 @@ function EditProductForm({
         </div>
       </FormSection>
 
+      <FormSection
+        number="04"
+        title="판매 상태"
+        description="판매 중지 상태로 변경해도 관리자 상품 목록에서 계속 확인할 수 있습니다."
+      >
+        <div className="flex flex-wrap gap-3">
+          <button
+            aria-pressed={active}
+            className={`h-11 rounded-lg border px-5 text-sm font-semibold transition ${
+              active
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+            }`}
+            type="button"
+            onClick={() => setActive(true)}
+          >
+            판매 중
+          </button>
+          <button
+            aria-pressed={!active}
+            className={`h-11 rounded-lg border px-5 text-sm font-semibold transition ${
+              !active
+                ? "border-amber-600 bg-amber-600 text-white"
+                : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+            }`}
+            type="button"
+            onClick={() => setActive(false)}
+          >
+            판매 중지
+          </button>
+        </div>
+      </FormSection>
+
       <div className="flex items-center justify-end gap-3 border-t border-zinc-200 pt-6">
         {error && (
           <p className="mr-auto text-sm text-red-600" role="alert">
@@ -1131,6 +1165,18 @@ function ProductList({
   onDialog: (type: DialogType) => void;
   onRegister: () => void;
 }) {
+  const [categoryFilter, setCategoryFilter] = useState<CategoryValue>("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">(
+    "",
+  );
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory =
+      categoryFilter === "" || product.categoryId === categoryFilter;
+    const matchesStatus =
+      statusFilter === "" || product.active === (statusFilter === "active");
+    return matchesCategory && matchesStatus;
+  });
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
       <div className="border-b border-zinc-100 p-5">
@@ -1148,9 +1194,12 @@ function ProductList({
             <div className="relative">
               <select
                 className={`${inputClass} w-44 appearance-none pl-9 pr-9`}
-                defaultValue=""
+                value={categoryFilter}
+                onChange={(event) =>
+                  setCategoryFilter(event.target.value as CategoryValue)
+                }
               >
-                <option value="">전체 카테고리</option>
+                <option value="">전체 상품</option>
                 {categories.map((category) => (
                   <option key={category.value} value={category.value}>
                     {category.label}
@@ -1167,11 +1216,14 @@ function ProductList({
             <div className="relative">
               <select
                 className={`${inputClass} w-40 appearance-none pr-9`}
-                defaultValue=""
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as typeof statusFilter)
+                }
               >
-                <option value="">전체 상태</option>
-                <option>판매 중</option>
-                <option>판매 중지</option>
+                <option value="">전체 판매 상태</option>
+                <option value="active">판매 중</option>
+                <option value="inactive">판매 중지</option>
               </select>
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-zinc-400">
                 <Icon name="chevron" size={14} />
@@ -1182,7 +1234,7 @@ function ProductList({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-zinc-500">
             <span className="font-semibold text-zinc-800">
-              {products.length}
+              {filteredProducts.length}
             </span>
             개 상품
           </p>
@@ -1231,7 +1283,7 @@ function ProductList({
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <tr
                 key={product.productId}
                 className="border-b border-zinc-100 text-sm last:border-0"
@@ -1306,7 +1358,7 @@ function ProductList({
           상품 목록을 불러오는 중입니다.
         </div>
       ) : (
-        products.length === 0 && (
+        filteredProducts.length === 0 && (
           <div className="flex min-h-[380px] flex-col items-center justify-center px-6 py-16 text-center">
             <div className="relative mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-50 text-zinc-400">
               <Icon name="box" size={35} strokeWidth={1.4} />
@@ -1315,25 +1367,30 @@ function ProductList({
               </span>
             </div>
             <h3 className="text-base font-bold text-zinc-800">
-              등록된 상품이 없습니다
+              {products.length === 0
+                ? "등록된 상품이 없습니다"
+                : "조건에 맞는 상품이 없습니다"}
             </h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-400">
-              Spring Boot API에 상품을 연결하면 이곳에서 목록을 확인하고 관리할
-              수 있습니다.
+              {products.length === 0
+                ? "Spring Boot API에 상품을 연결하면 이곳에서 목록을 확인하고 관리할 수 있습니다."
+                : "선택한 카테고리와 판매 상태에 해당하는 상품이 없습니다."}
             </p>
-            <button
-              className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-950"
-              type="button"
-              onClick={onRegister}
-            >
-              <Icon name="plus" size={16} />첫 상품 등록하기
-            </button>
+            {products.length === 0 && (
+              <button
+                className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-950"
+                type="button"
+                onClick={onRegister}
+              >
+                <Icon name="plus" size={16} />첫 상품 등록하기
+              </button>
+            )}
           </div>
         )
       )}
       <div className="flex items-center justify-between border-t border-zinc-100 px-5 py-4 text-xs text-zinc-400">
         <span>
-          전체 {products.length}개 중 {products.length}개 표시
+          전체 {products.length}개 중 {filteredProducts.length}개 표시
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -1762,7 +1819,9 @@ export default function AdminDashboard({
               onComplete={(updated) => {
                 setProducts((current) =>
                   current.map((item) =>
-                    item.productId === updated.productId ? { ...item, ...updated } : item,
+                    item.productId === updated.productId
+                      ? { ...item, ...updated }
+                      : item,
                   ),
                 );
                 setEditingProduct(undefined);

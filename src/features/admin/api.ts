@@ -60,7 +60,7 @@ export async function getAdminProduct(
 export type AdminProductUpdateInput = Omit<
   AdminProductInput,
   "thumbnailUrl" | "categoryName"
->;
+> & { active: boolean };
 
 async function readResponse<T>(response: Response): Promise<T> {
   let result: ApiResponse<T>;

@@ -12,11 +12,13 @@ import type {
   AdminProductUpdateInput,
 } from "@/features/admin/api";
 
+import { getCategories } from "@/features/products/api";
+import type { Category } from "@/features/products/types";
+
 import { ProductImage } from "@/components/common/product-image";
 
 type View = "register" | "list" | "edit";
 type DialogType = "delete-all" | "delete-selected" | null;
-type CategoryValue = "" | "housing" | "pcb" | "switches" | "keycaps";
 type IconName =
   | "box"
   | "plus"
@@ -34,23 +36,17 @@ type IconName =
   | "alert"
   | "menu";
 
-const categories: { label: string; value: Exclude<CategoryValue, ""> }[] = [
-  { label: "하우징", value: "housing" },
-  { label: "기판", value: "pcb" },
-  { label: "스위치", value: "switches" },
-  { label: "키캡", value: "keycaps" },
-];
-
-function getProductCategoryValue(product?: AdminProductRecord): CategoryValue {
-  if (!product) return "";
-  const knownId = categories.find(
-    (category) => category.value === product.categoryId,
+function productCategoryLabel(
+  product: AdminProductRecord,
+  categories: Category[],
+) {
+  if (product.categoryId === product.parentCategoryId) {
+    return `${product.categoryName} / 소분류 미지정`;
+  }
+  const parent = categories.find(
+    (category) => category.id === product.parentCategoryId,
   );
-  if (knownId) return knownId.value;
-  return (
-    categories.find((category) => category.label === product.categoryName)
-      ?.value ?? (product.categoryName === "기판 (PCB)" ? "pcb" : "")
-  );
+  return parent ? `${parent.label} / ${product.categoryName}` : product.categoryName;
 }
 
 const inputClass =
@@ -220,12 +216,52 @@ function FormSection({
   );
 }
 
+function SubcategorySelect({
+  categories,
+  parentId,
+  value,
+  onChange,
+  emptyLabel,
+  required = false,
+}: {
+  categories: Category[];
+  parentId: string;
+  value: string;
+  onChange: (id: string) => void;
+  emptyLabel: string;
+  required?: boolean;
+}) {
+  const children =
+    categories.find((category) => category.id === parentId)?.subcategories ?? [];
+  return (
+    <select
+      aria-label="소분류"
+      className={inputClass}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      disabled={children.length === 0}
+      required={required}
+    >
+      <option value="" disabled={required}>
+        {emptyLabel}
+      </option>
+      {children.map((child) => (
+        <option key={child.id} value={child.id}>
+          {child.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function ProductForm({
+  categories,
   mode,
   initialProduct,
   onCancel,
   onComplete,
 }: {
+  categories: Category[];
   mode: "register" | "edit";
   initialProduct?: AdminProductRecord;
   onCancel: () => void;
@@ -235,7 +271,8 @@ function ProductForm({
     { name: string; url: string; file: File }[]
   >([]);
   const [price, setPrice] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<CategoryValue>("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [spec, setSpec] = useState({
@@ -289,10 +326,6 @@ function ProductForm({
 
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const categoryValue = String(formData.get("categoryName") ?? "");
-    const categoryName = categories.find(
-      (category) => category.value === categoryValue,
-    )?.label;
     const name = String(formData.get("name") ?? "").trim();
     const basePrice = Number(
       String(formData.get("basePrice") ?? "").replaceAll(",", ""),
@@ -302,7 +335,7 @@ function ProductForm({
       String(formData.get("description") ?? "").trim() || null;
 
     if (
-      !categoryName ||
+      !subcategoryId ||
       !name ||
       !Number.isInteger(basePrice) ||
       basePrice <= 0 ||
@@ -314,7 +347,7 @@ function ProductForm({
     }
 
     const input: AdminProductInput = {
-      categoryName,
+      categoryId: subcategoryId,
       name,
       basePrice,
       stockQuantity,
@@ -337,6 +370,7 @@ function ProductForm({
       form.reset();
       setPrice("");
       setSelectedCategory("");
+      setSubcategoryId("");
       setSpec({
         layout: null,
         housingMaterial: null,
@@ -378,15 +412,16 @@ function ProductForm({
               />
             </Field>
           </div>
-          <Field label="상품 카테고리" required>
+          <Field label="대분류" required>
             <div className="relative">
               <select
                 className={`${inputClass} appearance-none pr-10`}
                 value={selectedCategory}
-                name="categoryName"
+                aria-label="대분류"
                 onChange={(event) => {
-                  const nextCategory = event.target.value as CategoryValue;
+                  const nextCategory = event.target.value;
                   setSelectedCategory(nextCategory);
+                  setSubcategoryId("");
                   setSpec({
                     layout: null,
                     housingMaterial: null,
@@ -403,7 +438,7 @@ function ProductForm({
                   카테고리 선택
                 </option>
                 {categories.map((category) => (
-                  <option key={category.value} value={category.value}>
+                  <option key={category.id} value={category.id}>
                     {category.label}
                   </option>
                 ))}
@@ -412,6 +447,16 @@ function ProductForm({
                 <Icon name="chevron" size={16} />
               </span>
             </div>
+          </Field>
+          <Field label="소분류" required>
+            <SubcategorySelect
+              categories={categories}
+              parentId={selectedCategory}
+              value={subcategoryId}
+              onChange={setSubcategoryId}
+              emptyLabel="소분류 선택"
+              required
+            />
           </Field>
           <div className="md:col-span-2">
             <Field label="상품 설명" hint="300자 이내로 입력해주세요">
@@ -726,10 +771,12 @@ function ProductForm({
 }
 
 function EditProductForm({
+  categories,
   product,
   onCancel,
   onComplete,
 }: {
+  categories: Category[];
   product: AdminProductRecord;
   onCancel: () => void;
   onComplete: (product: AdminProductRecord) => void;
@@ -764,10 +811,12 @@ function EditProductForm({
     [imagePreview],
   );
 
-  const categoryValue = getProductCategoryValue(product);
-  const categoryName = categories.find(
-    (category) => category.value === categoryValue,
-  )?.label;
+  const [categoryValue, setCategoryValue] = useState(product.parentCategoryId);
+  const originalSubcategoryId =
+    product.categoryId === product.parentCategoryId ? "" : product.categoryId;
+  const [subcategoryId, setSubcategoryId] = useState(originalSubcategoryId);
+  const parentChanged = categoryValue !== product.parentCategoryId;
+  const categoryChanged = parentChanged || subcategoryId !== originalSubcategoryId;
 
   const selectImage = (file?: File) => {
     if (!file) return;
@@ -797,14 +846,19 @@ function EditProductForm({
       !Number.isInteger(basePrice) ||
       basePrice <= 0 ||
       !Number.isInteger(stockQuantity) ||
-      stockQuantity < 0 ||
-      !categoryName
+      stockQuantity < 0
     ) {
       setError("상품명, 가격, 재고를 확인해 주세요.");
       return;
     }
 
+    if (categoryChanged && !subcategoryId) {
+      setError("소분류를 선택해 주세요.");
+      return;
+    }
+
     const input: AdminProductUpdateInput = {
+      ...(categoryChanged ? { categoryId: subcategoryId } : {}),
       name: name.trim(),
       basePrice,
       stockQuantity,
@@ -860,16 +914,43 @@ function EditProductForm({
             </Field>
           </div>
           <Field
-            label="상품 카테고리"
-            hint="카테고리 변경은 기존 스펙 초기화 API가 준비된 뒤 지원합니다."
+            label="대분류"
+            hint={parentChanged ? "저장하면 새 대분류에서 사용하지 않는 스펙이 삭제됩니다." : undefined}
           >
-            <select className={inputClass} value={categoryValue} disabled>
+            <select
+              aria-label="대분류"
+              className={inputClass}
+              value={categoryValue}
+              disabled={categories.length === 0}
+              onChange={(event) => {
+                const nextCategory = event.target.value;
+                setCategoryValue(nextCategory);
+                setSubcategoryId(
+                  nextCategory === product.parentCategoryId ? originalSubcategoryId : "",
+                );
+              }}
+            >
+              {categories.length === 0 && (
+                <option value={product.parentCategoryId}>
+                  {product.parentCategoryId}
+                </option>
+              )}
               {categories.map((category) => (
-                <option key={category.value} value={category.value}>
+                <option key={category.id} value={category.id}>
                   {category.label}
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="소분류">
+            <SubcategorySelect
+              categories={categories}
+              parentId={categoryValue}
+              value={subcategoryId}
+              onChange={setSubcategoryId}
+              emptyLabel={parentChanged || originalSubcategoryId ? "소분류 선택" : "소분류 미지정"}
+              required={parentChanged || Boolean(originalSubcategoryId)}
+            />
           </Field>
           <Field
             label="재고 수량"
@@ -1149,6 +1230,7 @@ function EditProductForm({
 }
 
 function ProductList({
+  categories,
   products,
   onEdit,
   onDetail,
@@ -1158,6 +1240,7 @@ function ProductList({
   onDialog,
   onRegister,
 }: {
+  categories: Category[];
   products: AdminProductRecord[];
   onEdit: (product: AdminProductRecord) => void;
   onDetail: (product: AdminProductRecord) => void;
@@ -1167,13 +1250,15 @@ function ProductList({
   onDialog: (type: DialogType) => void;
   onRegister: () => void;
 }) {
-  const [categoryFilter, setCategoryFilter] = useState<CategoryValue>("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">(
     "",
   );
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
-      categoryFilter === "" || product.categoryId === categoryFilter;
+      (!categoryFilter || product.parentCategoryId === categoryFilter) &&
+      (!subcategoryFilter || product.categoryId === subcategoryFilter);
     const matchesStatus =
       statusFilter === "" || product.active === (statusFilter === "active");
     return matchesCategory && matchesStatus;
@@ -1196,14 +1281,16 @@ function ProductList({
             <div className="relative">
               <select
                 className={`${inputClass} w-44 appearance-none pl-9 pr-9`}
+                aria-label="대분류 필터"
                 value={categoryFilter}
-                onChange={(event) =>
-                  setCategoryFilter(event.target.value as CategoryValue)
-                }
+                onChange={(event) => {
+                  setCategoryFilter(event.target.value);
+                  setSubcategoryFilter("");
+                }}
               >
                 <option value="">전체 상품</option>
                 {categories.map((category) => (
-                  <option key={category.value} value={category.value}>
+                  <option key={category.id} value={category.id}>
                     {category.label}
                   </option>
                 ))}
@@ -1214,6 +1301,15 @@ function ProductList({
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-zinc-400">
                 <Icon name="chevron" size={14} />
               </span>
+            </div>
+            <div className="w-44">
+              <SubcategorySelect
+                categories={categories}
+                parentId={categoryFilter}
+                value={subcategoryFilter}
+                onChange={setSubcategoryFilter}
+                emptyLabel="소분류 전체"
+              />
             </div>
             <div className="relative">
               <select
@@ -1313,7 +1409,7 @@ function ProductList({
                     {product.name}
                   </button>
                 </td>
-                <td className="px-3 py-3">{product.categoryName}</td>
+                <td className="px-3 py-3">{productCategoryLabel(product, categories)}</td>
                 <td className="px-3 py-3">
                   {new Intl.NumberFormat("ko-KR").format(product.basePrice)}원
                 </td>
@@ -1414,14 +1510,16 @@ function ProductList({
 }
 
 function ProductDetailDialog({
+  categories,
   product,
   onClose,
 }: {
+  categories: Category[];
   product: AdminProductRecord;
   onClose: () => void;
 }) {
   const rows = [
-    ["카테고리", product.categoryName],
+    ["카테고리", productCategoryLabel(product, categories)],
     ["판매가", `${new Intl.NumberFormat("ko-KR").format(product.basePrice)}원`],
     ["재고", String(product.stockQuantity)],
     ["판매 상태", product.active ? "판매 중" : "판매 중지"],
@@ -1580,6 +1678,26 @@ export default function AdminDashboard({
   const [detailProduct, setDetailProduct] = useState<AdminProductRecord>();
   const [listError, setListError] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryError, setCategoryError] = useState("");
+  const [categoryAttempt, setCategoryAttempt] = useState(0);
+
+  useEffect(() => {
+    let current = true;
+    getCategories()
+      .then((items) => {
+        if (current) {
+          setCategories(items.filter((category) => category.id !== "all"));
+        }
+      })
+      .catch(() => {
+        if (current) setCategoryError("카테고리를 불러오지 못했습니다.");
+      });
+    return () => {
+      current = false;
+    };
+  }, [categoryAttempt]);
 
   useEffect(() => {
     if (view !== "list") return;
@@ -1798,8 +1916,29 @@ export default function AdminDashboard({
             )}
           </div>
 
+          {categoryError ? (
+            <p role="alert" className="mb-4 text-sm text-red-700">
+              {categoryError}{" "}
+              <button
+                type="button"
+                className="underline"
+                onClick={() => {
+                  setCategoryError("");
+                  setCategoryAttempt((attempt) => attempt + 1);
+                }}
+              >
+                다시 불러오기
+              </button>
+            </p>
+          ) : categories.length === 0 && (
+            <p role="status" className="mb-4 text-sm text-zinc-500">
+              카테고리를 불러오는 중입니다.
+            </p>
+          )}
+
           {view === "list" ? (
             <ProductList
+              categories={categories}
               products={products}
               loading={loadingProducts}
               error={listError}
@@ -1815,6 +1954,7 @@ export default function AdminDashboard({
             />
           ) : view === "edit" && editingProduct ? (
             <EditProductForm
+              categories={categories}
               key={editingProduct.productId}
               product={editingProduct}
               onCancel={() => navigate("list")}
@@ -1833,6 +1973,7 @@ export default function AdminDashboard({
             />
           ) : (
             <ProductForm
+              categories={categories}
               key="register"
               mode="register"
               onCancel={() => navigate("list")}
@@ -1847,6 +1988,7 @@ export default function AdminDashboard({
       )}
       {detailProduct && (
         <ProductDetailDialog
+          categories={categories}
           product={detailProduct}
           onClose={() => setDetailProduct(undefined)}
         />

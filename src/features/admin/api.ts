@@ -7,7 +7,7 @@ type ApiResponse<T> = {
 };
 
 export type AdminProductInput = {
-  categoryName: string;
+  categoryId: string;
   name: string;
   basePrice: number;
   stockQuantity: number;
@@ -24,7 +24,8 @@ export type AdminProductInput = {
 
 export type AdminProductRecord = Omit<AdminProductInput, "thumbnailUrl"> & {
   productId: number;
-  categoryId: string;
+  categoryName: string;
+  parentCategoryId: string;
   thumbnailUrl: string | null;
   active: boolean;
   createdAt: string;
@@ -59,9 +60,10 @@ export async function getAdminProduct(
 
 export type AdminProductUpdateInput = Omit<
   AdminProductInput,
-  "thumbnailUrl" | "categoryName" | "isWireless"
+  "thumbnailUrl" | "categoryId" | "isWireless"
 > & {
   active: boolean;
+  categoryId?: string;
   isWireless?: boolean;
 };
 

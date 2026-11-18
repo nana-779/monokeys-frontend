@@ -28,7 +28,7 @@ type AppUser = ApiUser;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function StoreShell({ children }: { children: ReactNode }) {
-  const { products } = useContext(ProductCartContext);
+  const { products, refreshCart, setProducts } = useContext(ProductCartContext);
   const { openCart, closeCart } = useCart();
 
   const pathname = usePathname();
@@ -119,6 +119,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
     try {
       const { user } = await logIn(email, password);
       setAuthUser(user);
+      // 로그인한 회원의 장바구니를 서버에서 다시 불러와 헤더 개수에 반영
+      refreshCart();
       setAuthOpen(false);
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
@@ -141,6 +143,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
     try {
       await logOut();
       setAuthUser(null);
+      // 로그아웃하면 화면에 남아 있던 장바구니(헤더 개수 포함)를 비움
+      setProducts([]);
       setAuthOpen(false);
       router.replace("/");
     } catch {

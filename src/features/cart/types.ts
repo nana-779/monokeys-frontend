@@ -8,4 +8,5 @@ export type CartItem = {
   unitPrice: number
   shippingFee: number
   quantity: number
+  customDesignData?: string
 }

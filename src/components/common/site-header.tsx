@@ -1,38 +1,75 @@
-"use client";
+'use client'
 
-import Link from "next/link";
-import { useState } from "react";
-import { CloseIcon } from "@/components/icons";
-import type { ApiUser } from "@/features/auth/api";
+import Link from 'next/link'
+import { useState } from 'react'
+import { CloseIcon } from '@/components/icons'
+import type { ApiUser } from '@/features/auth/api'
 
-const categories = [
-  { label: "전체상품", href: "/products", children: [] },
+type SubCategoryItem = {
+  name: string
+  href: string
+}
+
+type CategoryItem = {
+  label: string
+  href: string
+  children: SubCategoryItem[]
+}
+
+const categories: CategoryItem[] = [
+  { label: '전체상품', href: '/products', children: [] },
   {
-    label: "HOUSING",
-    href: "/products?category=housing",
-    children: ["알루미늄", "폴리카보네이트", "목재"],
+    label: 'HOUSING',
+    href: '/products?category=housing',
+    children: [
+      { name: '알루미늄', href: '/products?category=housing&subcategory=housing-alu' },
+      { name: '폴리카보네이트', href: '/products?category=housing&subcategory=housing-pc' },
+      { name: '목재', href: '/products?category=housing&subcategory=housing-wood' },
+      { name: '아크릴', href: '/products?category=housing&subcategory=housing-acrylic' },
+      { name: '플라스틱', href: '/products?category=housing&subcategory=housing-plastic' },
+    ],
   },
   {
-    label: "PCB",
-    href: "/products?category=pcb",
-    children: ["65%", "75%", "텐키리스"],
+    label: 'PCB',
+    href: '/products?category=pcb',
+    children: [
+      { name: '65%', href: '/products?category=pcb&subcategory=kb-65' },
+      { name: '75%', href: '/products?category=pcb&subcategory=kb-75' },
+      { name: '텐키리스', href: '/products?category=pcb&subcategory=kb-tkl' },
+      { name: '핫스왑', href: '/products?category=pcb&subcategory=pcb-hotswap' },
+      { name: '유무선/블루투스', href: '/products?category=pcb&subcategory=pcb-wireless' },
+    ],
   },
   {
-    label: "SWITCHES",
-    href: "/products?category=switches",
-    children: ["리니어", "택타일"],
+    label: 'SWITCHES',
+    href: '/products?category=switches',
+    children: [
+      { name: '리니어', href: '/products?category=switches&subcategory=switch-linear' },
+      { name: '택타일', href: '/products?category=switches&subcategory=switch-tactile' },
+      { name: '저소음', href: '/products?category=switches&subcategory=switch-silent' },
+      { name: '클릭', href: '/products?category=switches&subcategory=switch-click' },
+    ],
   },
-  { label: "KEYCAPS", href: "/products?category=keycaps", children: [] },
-  { label: "CUSTOM", href: "/products", children: [] },
-];
+  {
+    label: 'KEYCAPS',
+    href: '/products?category=keycaps',
+    children: [
+      { name: 'PBT', href: '/products?category=keycaps&subcategory=keycap-pbt' },
+      { name: 'ABS', href: '/products?category=keycaps&subcategory=keycap-abs' },
+      { name: 'POM', href: '/products?category=keycaps&subcategory=keycap-pom' },
+      { name: '커스텀 풀 컬러 키캡', href: '/products?category=keycaps&subcategory=keycap-custom' },
+    ],
+  },
+  { label: 'CUSTOM', href: '/custom', children: [] },
+]
 
 type SiteHeaderProps = {
-  cartCount: number;
-  user: ApiUser | null;
-  visible: boolean;
-  onOpenCart: () => void;
-  onOpenAccount: () => void;
-};
+  cartCount: number
+  user: ApiUser | null
+  visible: boolean
+  onOpenCart: () => void
+  onOpenAccount: () => void
+}
 
 export function SiteHeader({
   cartCount,
@@ -41,14 +78,14 @@ export function SiteHeader({
   onOpenCart,
   onOpenAccount,
 }: SiteHeaderProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
 
   return (
     <>
       <header
-        className={`fixed inset-x-0 top-0 z-50 border-b border-zinc-300 bg-white/95 backdrop-blur transition-transform duration-500 ${visible ? "translate-y-0" : "-translate-y-full"}`}
+        className={`fixed inset-x-0 top-0 z-50 border-b border-zinc-300 bg-white/95 backdrop-blur transition-transform duration-500 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
         onMouseLeave={() => setMenuOpen(false)}
       >
         <div className="relative mx-auto h-[123px] w-[min(80%,1184px)] max-lg:w-[92%] md:h-[150px]">
@@ -64,26 +101,14 @@ export function SiteHeader({
             aria-label="Utility navigation"
             className="absolute right-0 top-[18px] flex items-center gap-3 text-[10px] font-medium tracking-[-0.01em] text-[#34264b] sm:gap-5 sm:text-[12px] lg:gap-7 lg:text-[15px]"
           >
-            <button
-              className="whitespace-nowrap"
-              onClick={() => setSearchOpen(true)}
-              type="button"
-            >
+            <button className="whitespace-nowrap" onClick={() => setSearchOpen(true)} type="button">
               SEARCH
             </button>
-            <button
-              className="whitespace-nowrap"
-              onClick={onOpenCart}
-              type="button"
-            >
+            <button className="whitespace-nowrap" onClick={onOpenCart} type="button">
               CART <span aria-label={`${cartCount} items`}>({cartCount})</span>
             </button>
-            <button
-              className="whitespace-nowrap"
-              onClick={onOpenAccount}
-              type="button"
-            >
-              {user ? (user.role === "admin" ? "ADMIN" : "MYPAGE") : "LOGIN"}
+            <button className="whitespace-nowrap" onClick={onOpenAccount} type="button">
+              {user ? (user.role === 'admin' ? 'ADMIN' : 'MYPAGE') : 'LOGIN'}
             </button>
           </nav>
 
@@ -104,7 +129,7 @@ export function SiteHeader({
           </nav>
         </div>
         <div
-          className={`absolute inset-x-0 top-full overflow-hidden bg-zinc-200 transition-all duration-300 ${menuOpen ? "max-h-80 opacity-100" : "pointer-events-none max-h-0 opacity-0"}`}
+          className={`absolute inset-x-0 top-full overflow-hidden bg-zinc-200 transition-all duration-300 ${menuOpen ? 'max-h-80 opacity-100' : 'pointer-events-none max-h-0 opacity-0'}`}
         >
           <div className="mx-auto grid w-[min(80%,1184px)] grid-cols-6 gap-5 py-9 max-lg:w-[92%] max-md:grid-cols-2">
             {categories.map((category) => (
@@ -112,12 +137,13 @@ export function SiteHeader({
                 {category.children.length > 0 && (
                   <ul className="space-y-2.5 text-sm text-zinc-600">
                     {category.children.map((child) => (
-                      <li key={child}>
+                      <li key={child.name}>
                         <Link
                           className="transition-colors hover:text-black"
-                          href={category.href}
+                          href={child.href}
+                          onClick={() => setMenuOpen(false)}
                         >
-                          {child}
+                          {child.name}
                         </Link>
                       </li>
                     ))}
@@ -165,11 +191,7 @@ export function SiteHeader({
               value={query}
             />
             {query && (
-              <button
-                className="text-sm text-zinc-500"
-                onClick={() => setQuery("")}
-                type="button"
-              >
+              <button className="text-sm text-zinc-500" onClick={() => setQuery('')} type="button">
                 지우기
               </button>
             )}
@@ -180,5 +202,5 @@ export function SiteHeader({
         </div>
       )}
     </>
-  );
+  )
 }

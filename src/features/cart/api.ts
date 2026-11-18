@@ -60,6 +60,13 @@ export async function addCartItemApi(productId: number, quantity: number): Promi
       alert('로그인이 필요한 서비스입니다.')
       return false
     }
+    // 재고 초과(400) 등 서버가 거부한 경우: 서버가 보낸 메시지를 그대로 보여 줌
+    if (error instanceof ApiRequestError) {
+      alert(error.message)
+      return false
+    }
+    // 서버가 꺼져 있는 등 응답 자체를 못 받은 경우
+    alert('장바구니에 담지 못했습니다. 잠시 후 다시 시도해 주세요.')
     console.error('장바구니 담기 실패:', error)
     return false
   }
@@ -78,6 +85,13 @@ export async function changeCartItem(productId: number, quantity: number): Promi
       alert('로그인이 필요한 서비스입니다.')
       return false
     }
+    // 재고 초과(400) 등 서버가 거부한 경우: 서버가 보낸 메시지를 그대로 보여 줌
+    if (error instanceof ApiRequestError) {
+      alert(error.message)
+      return false
+    }
+    // 서버가 꺼져 있는 등 응답 자체를 못 받은 경우
+    alert('수량을 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.')
     console.warn('수량 DB 동기화 실패:', error)
     return false
   }

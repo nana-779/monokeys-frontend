@@ -28,7 +28,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       <section className="mx-auto w-[min(80%,1440px)] py-16 max-lg:w-[92%]">
         <BackendErrorState
           message={backendError}
-          title="상품 정보를 백엔드/DB에서 불러오지 못했습니다"
+          title="상품 정보를 불러오지 못했습니다"
         />
         <div className="mt-6 text-center">
           <Link

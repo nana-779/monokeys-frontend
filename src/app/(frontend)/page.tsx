@@ -48,12 +48,6 @@ export default async function HomePage() {
             />
           )}
           <div className="absolute inset-0 bg-linear-to-r from-black/75 via-black/35 to-transparent" />
-          {backendError && (
-            <span className="absolute right-6 top-6 inline-flex items-center gap-2 rounded-full bg-red-600/90 px-3.5 py-1.5 text-[11px] font-semibold tracking-wider text-white backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-white" />
-              BACKEND OFFLINE
-            </span>
-          )}
           <div className="absolute inset-x-0 bottom-0 p-12 text-white max-md:p-7">
             <p className="mb-5 text-xs font-semibold tracking-[0.2em]">DESIGNED FOR THE DESK</p>
             <h1 className="max-w-3xl text-6xl font-medium leading-[0.95] tracking-[-0.065em] max-md:text-4xl">
@@ -88,7 +82,7 @@ export default async function HomePage() {
         {backendError ? (
           <BackendErrorState
             message={backendError}
-            title="백엔드 / DB 연결이 끊어져 상품을 불러올 수 없습니다"
+            title="상품을 불러오지 못했습니다"
           />
         ) : products.length ? (
           <div className="grid grid-cols-3 gap-7 max-lg:grid-cols-2 max-sm:grid-cols-1">
@@ -98,7 +92,7 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-zinc-300 py-24 text-center text-sm text-zinc-500">
-            DB에 등록된 상품이 없습니다.
+            등록된 상품이 없습니다.
           </div>
         )}
       </section>

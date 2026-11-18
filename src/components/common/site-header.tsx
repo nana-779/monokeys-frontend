@@ -57,6 +57,7 @@ const categories: CategoryItem[] = [
       { name: 'PBT', href: '/products?category=keycaps&subcategory=keycap-pbt' },
       { name: 'ABS', href: '/products?category=keycaps&subcategory=keycap-abs' },
       { name: 'POM', href: '/products?category=keycaps&subcategory=keycap-pom' },
+      { name: '커스텀 풀 컬러 키캡', href: '/products?category=keycaps&subcategory=keycap-custom' },
     ],
   },
   { label: 'CUSTOM', href: '/custom', children: [] },

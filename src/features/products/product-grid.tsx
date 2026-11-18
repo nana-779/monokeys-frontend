@@ -114,7 +114,7 @@ export function ProductGrid() {
         <BackendErrorState
           message={error}
           onRetry={() => setRetryCount((prev) => prev + 1)}
-          title="상품 목록을 백엔드/DB에서 불러오지 못했습니다"
+          title="상품 목록을 불러오지 못했습니다"
         />
       ) : products.length === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-300 py-24 text-center text-zinc-500">

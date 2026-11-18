@@ -126,7 +126,9 @@ export default function CustomBuilderPage() {
     (p) => p.parentCategoryId === 'switches' || p.parentCategoryId === 'switch',
   )
   const allKeycaps = catalogProducts.filter(
-    (p) => p.parentCategoryId === 'keycaps' || p.parentCategoryId === 'keycap',
+    (p) =>
+      (p.parentCategoryId === 'keycaps' || p.parentCategoryId === 'keycap') &&
+      p.categoryId !== 'keycap-custom',
   )
 
   // ==================== 수동 모드 호환 필터 ====================
@@ -399,13 +401,13 @@ export default function CustomBuilderPage() {
 
       {catalogLoading ? (
         <div className="py-24 text-center text-sm text-zinc-400">
-          백엔드 DB에서 커스텀 부품 목록을 불러오는 중입니다...
+          커스텀 부품 목록을 불러오는 중입니다...
         </div>
       ) : catalogError ? (
         <BackendErrorState
           message={catalogError}
           onRetry={loadCatalog}
-          title="커스텀 부품 목록을 백엔드/DB에서 불러오지 못했습니다"
+          title="커스텀 부품 목록을 불러오지 못했습니다"
         />
       ) : (
         <>

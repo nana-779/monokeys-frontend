@@ -3,6 +3,7 @@ import "../style.css";
 import { ProductCartContext } from "./CartContext";
 import type { ProductList, ProductType } from "../interface/Product";
 import { useRouter } from "next/navigation";
+import { formatPrice } from "@/lib/store-shared";
 
 type CartProps = {
   open: boolean;
@@ -75,7 +76,7 @@ export function Cart({ open, onClose } : CartProps) {
                     <div id="Cart-Footer">
                         <div id="Total-Const-Fraim">
                             <p id="Subtotal">Subtotal</p>
-                            <p id="Total-Cost">${totalCost.toLocaleString("ko-KR")}</p>
+                            <p id="Total-Cost">{formatPrice(totalCost)}</p>
                         </div>
                         <button id="Cart-Payment-Button"
                                 className={`transition-all duration-150 ${allItemCount > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
@@ -164,7 +165,7 @@ function ListItem({ product } : ProductList) {
                             </svg>
                         </button>
                     </div>
-                    <p id="Cart-Explain">${(product.price * product.quantity).toLocaleString("ko-KR")}</p>
+                    <p id="Cart-Explain">{formatPrice(product.price * product.quantity)}</p>
                 </div>
             </div>
         </ ul>

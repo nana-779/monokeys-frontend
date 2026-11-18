@@ -24,8 +24,39 @@ export type AdminProductInput = {
   keycapMaterial: string | null;
 };
 
-export async function getAdminProducts(): Promise<StoreProduct[]> {
-  throw new Error("TODO: 관리자 상품 목록 API를 연결하세요.");
+export type AdminProductRecord = Omit<AdminProductInput, "thumbnailUrl"> & {
+  productId: number;
+  categoryId: string;
+  thumbnailUrl: string | null;
+  active: boolean;
+  createdAt: string;
+};
+
+// 관리자 상품 전체 조회
+export async function getAdminProducts(): Promise<AdminProductRecord[]> {
+  const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
+    credentials: "include",
+  });
+  const result = (await response.json()) as ApiResponse<AdminProductRecord[]>;
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.message || "상품 목록을 불러올 수 없습니다");
+  }
+  return result.data;
+}
+
+// 관리자 상품 상세 조회
+export async function getAdminProduct(
+  productId: string,
+): Promise<AdminProductRecord> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
+    { credentials: "include" },
+  );
+  const result = (await response.json()) as ApiResponse<AdminProductRecord>;
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.message || "상품 상세 정보를 불러올 수 없습니다");
+  }
+  return result.data;
 }
 
 // 관리자 상품 등록
@@ -67,9 +98,10 @@ export async function updateAdminProduct(
   );
   if (image) body.append("image", image);
   const response = await fetch(
-    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}/edit`,
+    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
     {
       method: "PATCH",
+      credentials: "include",
       body,
     },
   );
@@ -108,6 +140,7 @@ export async function deleteAdminProduct(productId: string): Promise<void> {
     `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
     {
       method: "DELETE",
+      credentials: "include",
     },
   );
   const result = (await response.json()) as ApiResponse<null>;

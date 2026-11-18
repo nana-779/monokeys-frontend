@@ -99,19 +99,25 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       )
     );
 
-    await changeCartItem(id, finalQuantity);
+    // 서버가 거부하거나 실패하면, 먼저 바꿔 둔 화면을 서버(DB) 상태로 되돌림
+    const success = await changeCartItem(id, finalQuantity);
+    if (!success) await refreshCart();
   }
 
   // 4. 장바구니 상품 단건 삭제
   async function handleRemoveProduct(id: number) {
     setProducts((prevProducts) => prevProducts.filter((product) => product.productId !== id));
-    await removeCartItemApi(id);
+    // 서버가 거부하거나 실패하면, 먼저 바꿔 둔 화면을 서버(DB) 상태로 되돌림
+    const success = await removeCartItemApi(id);
+    if (!success) await refreshCart();
   }
 
   // 5. 장바구니 전체 비우기
   async function handleClearCart() {
     setProducts([]);
-    await clearCartApi();
+    // 서버가 거부하거나 실패하면, 먼저 바꿔 둔 화면을 서버(DB) 상태로 되돌림
+    const success = await clearCartApi();
+    if (!success) await refreshCart();
   }
 
   return (

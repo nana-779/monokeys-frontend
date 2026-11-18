@@ -738,6 +738,7 @@ function EditProductForm({
   const [price, setPrice] = useState(String(product.basePrice));
   const [stock, setStock] = useState(String(product.stockQuantity));
   const [active, setActive] = useState(product.active);
+  const [isWirelessEdited, setIsWirelessEdited] = useState(false);
   const [description, setDescription] = useState(product.description ?? "");
   const [spec, setSpec] = useState({
     layout: product.layout ?? "",
@@ -812,7 +813,9 @@ function EditProductForm({
       layout: spec.layout || null,
       housingMaterial: spec.housingMaterial || null,
       supportPins: spec.supportPins || null,
-      isWireless: categoryValue === "pcb" ? spec.isWireless : null,
+      ...(categoryValue === "pcb" && isWirelessEdited
+        ? { isWireless: spec.isWireless }
+        : {}),
       switchPin: spec.switchPin ? Number(spec.switchPin) : null,
       switchType: spec.switchType || null,
       keycapMaterial: spec.keycapMaterial || null,
@@ -964,12 +967,11 @@ function EditProductForm({
                     className="h-4 w-4 accent-zinc-900"
                     type="checkbox"
                     checked={spec.isWireless}
-                    onChange={(event) =>
-                      setSpec((current) => ({
-                        ...current,
-                        isWireless: event.target.checked,
-                      }))
-                    }
+                    onChange={(event) => {
+                      const isWireless = event.target.checked;
+                      setSpec((current) => ({ ...current, isWireless }));
+                      setIsWirelessEdited(true);
+                    }}
                   />
                   무선 지원
                 </label>

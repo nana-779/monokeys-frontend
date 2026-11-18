@@ -59,17 +59,18 @@ export async function getAdminProduct(
 
 export type AdminProductUpdateInput = Omit<
   AdminProductInput,
-  "thumbnailUrl" | "categoryName"
-> & { active: boolean };
+  "thumbnailUrl" | "categoryName" | "isWireless"
+> & {
+  active: boolean;
+  isWireless?: boolean;
+};
 
 async function readResponse<T>(response: Response): Promise<T> {
   let result: ApiResponse<T>;
   try {
     result = (await response.json()) as ApiResponse<T>;
   } catch {
-    throw new Error(
-      "서버 응답을 읽을 수 없습니다. 백엔드 상태를 확인해 주세요.",
-    );
+    throw new Error("서버 응답을 읽을 수 없습니다.");
   }
   if (!response.ok || !result.success || result.data == null) {
     throw new Error(result.message || "상품 요청을 처리할 수 없습니다.");

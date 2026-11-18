@@ -29,6 +29,7 @@ export async function apiRequest<T>(
   expectedStatus?: number,
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    cache: 'no-store',
     ...init,
     credentials: "include",
     headers: {

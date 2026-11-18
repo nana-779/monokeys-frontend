@@ -1,23 +1,23 @@
-"use client";
+'use client'
 
-import Image from "next/image";
-import Link from "next/link";
-import { BagIcon, CloseIcon, MinusIcon, PlusIcon } from "@/components/icons";
-import { formatPrice } from "@/lib/store-shared";
-import type { CartItem } from "@/features/cart/types";
+import Image from 'next/image'
+import Link from 'next/link'
+import { BagIcon, CloseIcon, MinusIcon, PlusIcon } from '@/components/icons'
+import { formatPrice } from '@/lib/store-shared'
+import type { CartItem } from '@/features/cart/types'
 
-const cartItemKey = (item: CartItem) => `${item.productId}::${item.optionValue ?? ""}`;
+const cartItemKey = (item: CartItem) => `${item.productId}::${item.optionValue ?? ''}`
 
 type CartDrawerProps = {
-  open: boolean;
-  items: CartItem[];
-  selectedItems: CartItem[];
-  selectedKeys: string[];
-  onClose: () => void;
-  onSelectAll: (selected: boolean) => void;
-  onToggleSelected: (item: CartItem) => void;
-  onUpdateQuantity: (index: number, quantity: number) => void;
-};
+  open: boolean
+  items: CartItem[]
+  selectedItems: CartItem[]
+  selectedKeys: string[]
+  onClose: () => void
+  onSelectAll: (selected: boolean) => void
+  onToggleSelected: (item: CartItem) => void
+  onUpdateQuantity: (index: number, quantity: number) => void
+}
 
 export function CartDrawer({
   open,
@@ -29,21 +29,21 @@ export function CartDrawer({
   onToggleSelected,
   onUpdateQuantity,
 }: CartDrawerProps) {
-  const subtotal = selectedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
 
   return (
     <div
       aria-hidden={!open}
-      className={`fixed inset-0 z-[60] transition ${open ? "pointer-events-auto" : "pointer-events-none"}`}
+      className={`fixed inset-0 z-[60] transition ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
       <button
         aria-label="장바구니 닫기"
-        className={`absolute inset-0 bg-black/50 transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
+        className={`absolute inset-0 bg-black/50 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
         type="button"
       />
       <aside
-        className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white p-7 shadow-2xl transition-transform duration-500 ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white p-7 shadow-2xl transition-transform duration-500 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 pb-5">
           <h2 className="text-2xl font-medium tracking-[-0.04em]">Your cart</h2>
@@ -88,23 +88,43 @@ export function CartDrawer({
                   />
                   <div className="size-20 shrink-0 overflow-hidden rounded-md bg-zinc-100">
                     {item.image && (
-                      <Image alt="" className="size-full object-cover grayscale" height={80} src={item.image} width={80} />
+                      <Image
+                        alt=""
+                        className="size-full object-cover grayscale"
+                        height={80}
+                        src={item.image}
+                        width={80}
+                      />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{item.name}</p>
-                    {item.optionLabel && <p className="mt-1 text-xs text-zinc-500">{item.optionLabel}</p>}
+                    {item.optionLabel && (
+                      <p className="mt-1 text-xs text-zinc-500">{item.optionLabel}</p>
+                    )}
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center rounded-full border border-zinc-200">
-                        <button aria-label="수량 줄이기" className="p-1.5" onClick={() => onUpdateQuantity(index, item.quantity - 1)} type="button">
+                        <button
+                          aria-label="수량 줄이기"
+                          className="p-1.5"
+                          onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                          type="button"
+                        >
                           <MinusIcon />
                         </button>
                         <span className="w-7 text-center text-xs">{item.quantity}</span>
-                        <button aria-label="수량 늘리기" className="p-1.5" onClick={() => onUpdateQuantity(index, item.quantity + 1)} type="button">
+                        <button
+                          aria-label="수량 늘리기"
+                          className="p-1.5"
+                          onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                          type="button"
+                        >
                           <PlusIcon />
                         </button>
                       </div>
-                      <p className="text-sm font-semibold">{formatPrice(item.unitPrice * item.quantity)}</p>
+                      <p className="text-sm font-semibold">
+                        {formatPrice(item.unitPrice * item.quantity)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -127,5 +147,5 @@ export function CartDrawer({
         </div>
       </aside>
     </div>
-  );
+  )
 }

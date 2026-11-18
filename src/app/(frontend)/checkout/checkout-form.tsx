@@ -67,7 +67,9 @@ export function CheckoutForm() {
             </div>
           ))}
           {!selectedItems.length && (
-            <p className="py-8 text-center text-sm text-zinc-500">선택된 상품이 없습니다. 장바구니에서 주문할 상품을 선택해 주세요.</p>
+            <p className="py-8 text-center text-sm text-zinc-500">
+              선택된 상품이 없습니다. 장바구니에서 주문할 상품을 선택해 주세요.
+            </p>
           )}
         </div>
         <dl className="space-y-3 text-sm">

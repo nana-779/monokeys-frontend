@@ -56,9 +56,5 @@ export async function apiRequest<T>(
     throw new ApiRequestError('서버 응답을 확인하지 못했습니다. 다시 시도해 주세요.', response.status)
   }
   if (response.status === 204) return undefined as T
-  const json = (await response.json()) as any
-  if (json && typeof json === 'object' && json.success === true && 'data' in json) {
-    return json.data as T
-  }
-  return json as T
+  return (await response.json()) as T
 }

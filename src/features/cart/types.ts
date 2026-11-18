@@ -8,4 +8,7 @@ export type CartItem = {
   unitPrice: number
   shippingFee: number
   quantity: number
+  manualBuildId?: number
+  autoBuildId?: number
+  buildType?: 'MANUAL' | 'AUTO'
 }

@@ -8,8 +8,50 @@ import { BackendErrorState } from '@/components/common/backend-error-state'
 import { ArrowIcon } from '@/components/icons'
 import { useCart } from '@/features/cart/cart-provider'
 import { getPaginatedProducts } from '@/features/products/api'
+import {
+  createAutoBuild,
+  createManualBuild,
+  recommendAutoBuild,
+  type BuildItemResponse,
+} from '@/features/products/builds-api'
 import type { Product } from '@/features/products/types'
 import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
+
+function mapBuildItemToProduct(item: BuildItemResponse, catalog: Product[]): Product {
+  const catalogMatch = catalog.find((p) => p.productId === item.productId)
+  if (catalogMatch) {
+    return {
+      ...catalogMatch,
+      basePrice: item.unitPrice,
+    }
+  }
+  const categoryByPartType: Record<BuildItemResponse['partType'], string> = {
+    HOUSING: 'housing',
+    PCB: 'keyboards',
+    SWITCH: 'switches',
+    KEYCAP: 'keycaps',
+  }
+  return {
+    productId: item.productId,
+    categoryId: categoryByPartType[item.partType],
+    parentCategoryId: categoryByPartType[item.partType],
+    name: item.productName,
+    basePrice: item.unitPrice,
+    stockQuantity: 1,
+    thumbnailUrl: item.thumbnailUrl || '',
+    description: '',
+    options: [],
+    layout: item.layout || undefined,
+    supportPins: item.supportPins && item.supportPins.length > 0 ? item.supportPins : [3, 5],
+    isWireless: item.isWireless ?? undefined,
+    pin: item.switchPin ?? undefined,
+    switchType: item.switchType || undefined,
+    soundType: inferSoundType(item.switchType || undefined),
+    material: item.material || undefined,
+    isSoldOut: false,
+    status: 'ACTIVE',
+  }
+}
 
 function inferSoundType(switchType?: string, description?: string): string {
   const norm = (switchType || '').trim().toLowerCase()
@@ -62,11 +104,14 @@ interface ManualSelectionState {
 }
 
 interface BuildData {
+  buildId?: number | null
+  buildType: 'MANUAL' | 'AUTO'
+  buildName?: string
   housing: Product
   pcb: Product
   switchPart: Product
   keycap: Product
-  assemblyFee?: number
+  assemblyFee: number
   totalPrice: number
 }
 
@@ -116,6 +161,8 @@ export default function CustomBuilderPage() {
     keycapStyle: 'PBT',
   })
   const [recommendedBuild, setRecommendedBuild] = useState<BuildData | null>(null)
+  const [recommendLoading, setRecommendLoading] = useState(false)
+  const [savingBuild, setSavingBuild] = useState(false)
 
   // ==================== 부품 목록 데이터 분리 ====================
   const allHousings = catalogProducts.filter((p) => p.parentCategoryId === 'housing')
@@ -198,117 +245,110 @@ export default function CustomBuilderPage() {
     return total
   }
 
-  // ==================== 자동 추천 알고리즘 로직 ====================
-  const handleGenerateRecommendation = () => {
-    const availableOrAll = (items: Product[]) => {
-      const avail = items.filter((item) => !isProductSoldOut(item))
-      return avail.length > 0 ? avail : items
+  // ==================== 자동 추천 알고리즘 로직 (백엔드 /api/builds/auto/recommend 연동) ====================
+  const handleGenerateRecommendation = async () => {
+    if (recommendLoading) return
+    setRecommendLoading(true)
+    try {
+      const response = await recommendAutoBuild({
+        surveyLayout: surveyAnswers.layout,
+        surveyConnectivity: surveyAnswers.connectivity,
+        surveySound: surveyAnswers.soundPref,
+        surveyKeycap: surveyAnswers.keycapStyle,
+        includeAssembly,
+      })
+
+      const housingItem = response.items.find((item) => item.partType === 'HOUSING')
+      const pcbItem = response.items.find((item) => item.partType === 'PCB')
+      const switchItem = response.items.find((item) => item.partType === 'SWITCH')
+      const keycapItem = response.items.find((item) => item.partType === 'KEYCAP')
+
+      if (!housingItem || !pcbItem || !switchItem || !keycapItem) {
+        throw new Error('추천 견적 구성품 정보가 불완전합니다.')
+      }
+
+      setRecommendedBuild({
+        buildId: response.buildId ?? null,
+        buildType: 'AUTO',
+        buildName: response.buildName,
+        housing: mapBuildItemToProduct(housingItem, catalogProducts),
+        pcb: mapBuildItemToProduct(pcbItem, catalogProducts),
+        switchPart: mapBuildItemToProduct(switchItem, catalogProducts),
+        keycap: mapBuildItemToProduct(keycapItem, catalogProducts),
+        assemblyFee: response.assemblyFee,
+        totalPrice: response.totalPrice,
+      })
+      setSurveyStep(5)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '맞춤 견적을 생성하지 못했습니다.')
+    } finally {
+      setRecommendLoading(false)
     }
-
-    const housingCandidates = availableOrAll(allHousings)
-    const matchedHousing =
-      housingCandidates.find((h) => h.layout === surveyAnswers.layout) || housingCandidates[0]
-
-    if (!matchedHousing) {
-      alert('추천 가능한 하우징 부품이 없습니다.')
-      return
-    }
-
-    const pcbCandidates = availableOrAll(allPcbs)
-
-    let matchedPcb = pcbCandidates.find(
-      (pcb) =>
-        pcb.layout === matchedHousing.layout &&
-        (surveyAnswers.connectivity === 'wireless' ? pcb.isWireless : true),
-    )
-    if (!matchedPcb) {
-      matchedPcb =
-        pcbCandidates.find((pcb) => pcb.layout === matchedHousing.layout) || pcbCandidates[0]
-    }
-    if (!matchedPcb) {
-      alert('추천 가능한 기판 부품이 없습니다.')
-      return
-    }
-
-    const switchCandidates = availableOrAll(allSwitches)
-
-    let matchedSwitch = switchCandidates.find(
-      (sw) =>
-        sw.soundType === surveyAnswers.soundPref &&
-        (matchedPcb.supportPins || [3, 5]).includes(sw.pin || 3),
-    )
-    if (!matchedSwitch) {
-      matchedSwitch =
-        switchCandidates.find((sw) => (matchedPcb.supportPins || [3, 5]).includes(sw.pin || 3)) ||
-        switchCandidates[0]
-    }
-    if (!matchedSwitch) {
-      alert('추천 가능한 스위치 부품이 없습니다.')
-      return
-    }
-
-    const keycapCandidates = availableOrAll(allKeycaps)
-
-    const matchedKeycap =
-      keycapCandidates.find((k) => k.material === surveyAnswers.keycapStyle) || keycapCandidates[0]
-    if (!matchedKeycap) {
-      alert('추천 가능한 키캡 부품이 없습니다.')
-      return
-    }
-
-    const housingPrice = matchedHousing.basePrice || 0
-    const pcbPrice = matchedPcb.basePrice || 0
-    const switchPrice = matchedSwitch.basePrice || 0
-    const keycapPrice = matchedKeycap.basePrice || 0
-
-    setRecommendedBuild({
-      housing: matchedHousing,
-      pcb: matchedPcb,
-      switchPart: matchedSwitch,
-      keycap: matchedKeycap,
-      assemblyFee: 20000,
-      totalPrice: housingPrice + pcbPrice + switchPrice + keycapPrice + 20000,
-    })
-    setSurveyStep(5)
   }
 
-  // 장바구니 담기 핸들러 (팀 장바구니에 4개 부품 전달)
-  const handleAddBuildToCart = (build: BuildData) => {
-    const parts = [
-      { p: build.housing, opt: null },
-      { p: build.pcb, opt: null },
-      { p: build.switchPart, opt: null },
-      { p: build.keycap, opt: build.keycap.selectedOption },
-    ]
+  // 장바구니 담기 핸들러 (백엔드 /api/builds 저장 후 장바구니 전달)
+  const handleAddBuildToCart = async (build: BuildData) => {
+    if (savingBuild) return
+    setSavingBuild(true)
+    try {
+      const saved =
+        build.buildType === 'AUTO'
+          ? await createAutoBuild({
+              buildName: build.buildName,
+              surveyLayout: surveyAnswers.layout,
+              surveyConnectivity: surveyAnswers.connectivity,
+              surveySound: surveyAnswers.soundPref,
+              surveyKeycap: surveyAnswers.keycapStyle,
+              housingProductId: build.housing.productId,
+              pcbProductId: build.pcb.productId,
+              switchProductId: build.switchPart.productId,
+              keycapProductId: build.keycap.productId,
+              includeAssembly,
+            })
+          : await createManualBuild({
+              buildName: build.buildName,
+              housingProductId: build.housing.productId,
+              pcbProductId: build.pcb.productId,
+              switchProductId: build.switchPart.productId,
+              keycapProductId: build.keycap.productId,
+              includeAssembly,
+            })
 
-    parts.forEach(({ p, opt }) => {
+      const buildId = saved.buildId ?? build.buildId ?? 0
       addItem({
-        productId: String(p.productId),
-        slug: String(p.productId),
-        name: `[커스텀] ${p.name}`,
-        image: p.thumbnailUrl,
-        optionValue: opt ? String(opt.optionId) : undefined,
-        optionLabel: opt?.optionName,
-        unitPrice: p.basePrice + (opt?.additionalPrice || 0),
+        productId: `${saved.buildType.toLowerCase()}-build-${buildId}`,
+        slug: `custom-build-${buildId}`,
+        name: saved.buildName,
+        image: build.housing.thumbnailUrl,
+        optionLabel: `${build.housing.name} 외 3종 (${saved.includeAssembly ? '조립 대행 포함' : '직접 조립'})`,
+        unitPrice: saved.totalPrice,
         shippingFee: 0,
         quantity: 1,
+        buildType: saved.buildType,
+        ...(saved.buildType === 'MANUAL'
+          ? { manualBuildId: buildId }
+          : { autoBuildId: buildId }),
       })
-    })
 
-    openCart()
-    alert(
-      `[커스텀 키보드 구성품 4종]\n` +
-        `- 하우징: ${build.housing.name} (${build.housing.layout}%)\n` +
-        `- 기판: ${build.pcb.name}\n` +
-        `- 스위치: ${build.switchPart.name}\n` +
-        `- 키캡: ${build.keycap.name} ${build.keycap.selectedOption ? `(${build.keycap.selectedOption.optionName})` : ''}\n` +
-        `${includeAssembly ? '+ 조립 대행 공임비 (20,000원)\n' : ''}\n` +
-        `총 금액 ${formatPrice(build.totalPrice)}이 장바구니에 담겼습니다.`,
-    )
+      openCart()
+      alert(
+        `[커스텀 키보드 빌드 #${buildId} 저장 완료]\n` +
+          `- 하우징: ${build.housing.name} (${build.housing.layout || ''}%)\n` +
+          `- 기판: ${build.pcb.name}\n` +
+          `- 스위치: ${build.switchPart.name}\n` +
+          `- 키캡: ${build.keycap.name}${build.keycap.selectedOption ? ` (${build.keycap.selectedOption.optionName})` : ''}\n` +
+          `${saved.includeAssembly ? `+ 조립 대행 공임비 (${formatPrice(saved.assemblyFee)})\n` : ''}\n` +
+          `서버 확정 총액 ${formatPrice(saved.totalPrice)}이 장바구니에 담겼습니다.`,
+      )
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')
+    } finally {
+      setSavingBuild(false)
+    }
   }
 
   // 수동 빌드 장바구니 담기
-  const handleManualAddToCart = () => {
+  const handleManualAddToCart = async () => {
     if (
       !manualSelection.housing ||
       !manualSelection.pcb ||
@@ -320,6 +360,7 @@ export default function CustomBuilderPage() {
     }
 
     const build: BuildData = {
+      buildType: 'MANUAL',
       housing: manualSelection.housing,
       pcb: manualSelection.pcb,
       switchPart: manualSelection.switchPart,
@@ -328,7 +369,7 @@ export default function CustomBuilderPage() {
       totalPrice: getManualTotalPrice(),
     }
 
-    handleAddBuildToCart(build)
+    await handleAddBuildToCart(build)
   }
 
   // 수동 모드 현재 스텝의 상품 목록
@@ -648,11 +689,12 @@ export default function CustomBuilderPage() {
                   </button>
                 ) : (
                   <button
-                    className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-8 py-3 text-xs font-semibold tracking-wider text-white transition hover:bg-zinc-800"
+                    className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-8 py-3 text-xs font-semibold tracking-wider text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+                    disabled={recommendLoading}
                     onClick={handleGenerateRecommendation}
                     type="button"
                   >
-                    ⚡ 맞춤 견적 확인하기
+                    {recommendLoading ? '견적 생성 중...' : '⚡ 맞춤 견적 확인하기'}
                   </button>
                 )}
               </div>
@@ -781,11 +823,12 @@ export default function CustomBuilderPage() {
                         설문 다시 하기
                       </button>
                       <button
-                        className="rounded-full bg-zinc-950 px-7 py-2.5 text-xs font-semibold tracking-wider text-white transition hover:bg-zinc-800 active:scale-[0.99]"
+                        className="rounded-full bg-zinc-950 px-7 py-2.5 text-xs font-semibold tracking-wider text-white transition hover:bg-zinc-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-zinc-400"
+                        disabled={savingBuild}
                         onClick={() => handleAddBuildToCart(recommendedBuild)}
                         type="button"
                       >
-                        장바구니 담기
+                        {savingBuild ? '빌드 저장 중...' : '장바구니 담기'}
                       </button>
                     </div>
                   </div>
@@ -990,11 +1033,15 @@ export default function CustomBuilderPage() {
 
                 <button
                   className="mt-6 w-full rounded-md bg-zinc-950 py-3 text-xs font-semibold tracking-wider text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
-                  disabled={!isAllManualSelected}
+                  disabled={!isAllManualSelected || savingBuild}
                   onClick={handleManualAddToCart}
                   type="button"
                 >
-                  {isAllManualSelected ? '커스텀 견적 장바구니 담기' : '부품을 모두 선택해주세요'}
+                  {savingBuild
+                    ? '커스텀 빌드 저장 중...'
+                    : isAllManualSelected
+                      ? '커스텀 견적 장바구니 담기'
+                      : '부품을 모두 선택해주세요'}
                 </button>
               </div>
             </div>

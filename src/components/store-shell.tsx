@@ -17,6 +17,7 @@ import {
   type ApiUser,
 } from "@/features/auth/api";
 import { useCart } from "@/features/cart/cart-provider";
+import { WithdrawalSessionContext } from "@/features/user/withdrawal-session";
 import { ApiRequestError } from "@/lib/api-client";
 
 type AppUser = ApiUser;
@@ -27,7 +28,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function StoreShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { items, openCart, closeCart } = useCart();
+  const { items, openCart, closeCart, clearCart } = useCart();
+  const [sessionVersion, setSessionVersion] = useState(0);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
@@ -46,7 +48,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
     let ignore = false;
     getCurrentUser()
       .then(({ user }) => {
-        if (!ignore) setAuthUser(user);
+        if (!ignore) { setAuthUser(user); setSessionVersion(v => v + 1); }
       })
       .catch(() => {
         if (!ignore) setAuthUser(null);
@@ -114,6 +116,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
     try {
       const { user } = await logIn(email, password);
       setAuthUser(user);
+      setSessionVersion(v => v + 1);
       setAuthOpen(false);
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
@@ -157,7 +160,22 @@ export function StoreShell({ children }: { children: ReactNode }) {
         user={authUser}
         visible={navVisible}
       />
-      <main className="min-h-screen pt-[123px] md:pt-[150px]">{children}</main>
+      <main className="min-h-screen pt-[123px] md:pt-[150px]">
+        <WithdrawalSessionContext.Provider value={authUser ? {
+          user: authUser,
+          sessionVersion,
+          clearAfterWithdrawal: () => {
+            setAuthUser(null);
+            setSessionVersion(v => v + 1);
+            setAuthOpen(false);
+            setAuthError("");
+            closeCart();
+            clearCart();
+          },
+        } : null}>
+          {children}
+        </WithdrawalSessionContext.Provider>
+      </main>
       <div
         className={`fixed inset-0 z-[60] transition ${authOpen ? "pointer-events-auto" : "pointer-events-none"}`}
         aria-hidden={!authOpen}
@@ -206,6 +224,15 @@ export function StoreShell({ children }: { children: ReactNode }) {
                     {authUser.role}
                   </strong>
                 </div>
+                {authUser.role === "user" && (
+                  <Link
+                    className="mt-5 inline-flex h-12 items-center justify-center rounded-md border border-zinc-300 text-sm font-semibold transition hover:border-zinc-950 hover:bg-zinc-50"
+                    href="/mypage"
+                    onClick={() => setAuthOpen(false)}
+                  >
+                    마이페이지
+                  </Link>
+                )}
                 {authUser.role === "admin" && (
                   <Link
                     className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-800"

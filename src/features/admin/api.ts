@@ -85,6 +85,33 @@ export async function createAdminProduct(
   input: AdminProductInput,
   image?: File,
 ): Promise<number> {
+  // 스프링부트의 관리자 상품등록 api 호출
+  const body = new FormData();
+  body.append(
+    "product",
+    new Blob([JSON.stringify(input)], { type: "application/json" }),
+  );
+  if (image) body.append("image", image);
+  const response = await fetch(`${API_BASE_URL}/api/admin/products`, {
+    method: "POST",
+    credentials: "include",
+    body,
+  });
+
+  const result = (await response.json()) as ApiResponse<{ productId: number }>;
+
+  if (!response.ok || !result.success || result.data == null) {
+    throw new Error(result.message || "상품을 등록할 수 없습니다");
+  }
+
+  return result.data.productId;
+}
+
+export async function updateAdminProduct(
+  productId: string,
+  input: AdminProductInput,
+  image?: File,
+): Promise<StoreProduct> {
   const body = new FormData();
   body.append(
     "product",

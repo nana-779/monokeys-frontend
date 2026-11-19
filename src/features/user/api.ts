@@ -40,6 +40,39 @@ export async function signUpCustomer(input: CustomerSignupRequest): Promise<void
   await memberRequest('/api/users/signup', { method: 'POST', body: JSON.stringify(input) }, 201)
 }
 
-export async function deleteCustomerAccount(): Promise<void> {
-  throw new Error('TODO: 회원탈퇴 API를 연결하세요.')
+async function requestWithdrawal<T>(
+  path: string, method: 'POST' | 'DELETE', password: string, status: number, signal: AbortSignal,
+): Promise<T | undefined> {
+  try {
+    return await memberRequest<T>(path, {
+      method,
+      signal,
+      body: JSON.stringify({ password }),
+    }, status)
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      throw new ApiRequestError('로그인 정보를 다시 확인해 주세요.', error.status)
+    }
+    if (error instanceof ApiRequestError && error.status === 403
+      && error.message === 'API request failed (403)') {
+      throw new ApiRequestError('요청 권한 또는 보안 인증을 확인하지 못했습니다. 다시 로그인 후 시도해 주세요.', error.status)
+    }
+    throw error
+  }
+}
+
+// POST는 비밀번호 일치 여부를 받고, 실제 계정 처리는 아래 DELETE에서 수행합니다.
+export async function verifyWithdrawalPassword(password: string, signal: AbortSignal): Promise<boolean> {
+  const result = await requestWithdrawal<{ verified?: unknown } | null>(
+    '/api/users/me/verify-password', 'POST', password, 200, signal,
+  )
+  if (typeof result?.verified !== 'boolean') {
+    throw new Error('비밀번호 확인 결과를 확인하지 못했습니다.')
+  }
+  return result.verified
+}
+
+// 최종 탈퇴는 팀 백엔드의 200과 success: true 응답을 확인합니다.
+export async function deleteCustomerAccount(password: string, signal: AbortSignal): Promise<void> {
+  await requestWithdrawal('/api/users/me', 'DELETE', password, 200, signal)
 }

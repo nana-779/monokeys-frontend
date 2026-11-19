@@ -29,9 +29,9 @@ export async function uploadCustomKeycapImages(
     credentials: 'include',
     body: formData,
   })
-  const result = (await response.json()) as ApiResponse<CustomKeycapImageUploadResult>
-  if (!response.ok || !result.success || !result.data) {
-    throw new Error(result.message || '커스텀 키캡 이미지를 업로드하지 못했습니다.')
+  const result = (await response.json().catch(() => null)) as ApiResponse<CustomKeycapImageUploadResult> | null
+  if (!response.ok || !result?.success || !result.data) {
+    throw new Error(result?.message || '커스텀 키캡 이미지를 업로드하지 못했습니다.')
   }
   return result.data
 }

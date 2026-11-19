@@ -83,7 +83,7 @@ export function KeyboardMountPreview({
     if (isTarget) {
       return (
         <div
-          className="relative flex h-8 items-center justify-center overflow-hidden rounded-[4px] border-2 border-blue-500 shadow-sm ring-2 ring-blue-400/50 max-sm:h-6"
+          className="relative flex h-10 items-center justify-center overflow-hidden rounded-[4px] border-2 border-blue-500 shadow-sm ring-2 ring-blue-400/50 max-sm:h-7"
           key={id}
           style={{ ...flexStyle, backgroundColor }}
           title={`내 커스텀 키캡 (${meta.keyType})`}
@@ -92,7 +92,7 @@ export function KeyboardMountPreview({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt="커스텀 키캡 장착 미리보기"
-              className="h-full w-full object-contain"
+              className="h-full w-full object-cover"
               src={previewDataUrl}
             />
           ) : (
@@ -104,7 +104,7 @@ export function KeyboardMountPreview({
 
     return (
       <div
-        className={`flex h-8 items-center justify-center rounded-[4px] border text-[9px] font-medium select-none max-sm:h-6 max-sm:text-[7px] ${caseFinish.keycapBg} ${caseFinish.keycapText}`}
+        className={`flex h-10 items-center justify-center rounded-[4px] border text-[9px] font-medium select-none max-sm:h-7 max-sm:text-[7px] ${caseFinish.keycapBg} ${caseFinish.keycapText}`}
         key={id}
         style={flexStyle}
       >

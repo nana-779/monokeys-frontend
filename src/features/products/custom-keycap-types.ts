@@ -75,7 +75,7 @@ export interface LayerBox {
 export const BLEED_PAD = 24
 export const ROTATE_HANDLE_OFFSET = 22
 export const MIN_IMAGE_SCALE = 0.15
-export const MAX_IMAGE_SCALE = 3.0
+export const MAX_IMAGE_SCALE = 12.0
 export const MIN_FONT_SIZE = 10
 export const MAX_FONT_SIZE = 96
 export const MAX_TEXT_LAYERS = 8
@@ -151,10 +151,10 @@ export function resolveKeycapMeta(productName: string): KeycapSpecMeta {
       keyType: 'Space Bar',
       keySize: '6.25u',
       dimensions: '11.8 × 1.78 × 1.16cm',
-      canvasWidth: 680,
-      canvasHeight: 220,
+      canvasWidth: 720,
+      canvasHeight: 168,
       safeInsetX: 52,
-      safeInsetY: 42,
+      safeInsetY: 22,
     }
   }
   if (productName.includes('Enter')) {

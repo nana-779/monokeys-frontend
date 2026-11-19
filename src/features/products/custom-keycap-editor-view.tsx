@@ -897,7 +897,12 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
       bodyW / (imageLayer.element.width * fitScale),
       bodyH / (imageLayer.element.height * fitScale),
     )
-    setImageLayer({ ...imageLayer, scale: clampImageScale(coverScale), x: 0.5, y: 0.5 })
+    setImageLayer({
+      ...imageLayer,
+      scale: clampImageScale(Math.ceil(coverScale * 100) / 100),
+      x: 0.5,
+      y: 0.5,
+    })
   }
 
   const applySafeAreaFitScale = () => {
@@ -1400,7 +1405,7 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
                             <input
                               aria-label="이미지 크기 퍼센트"
                               className="w-12 rounded border border-zinc-300 bg-white px-1 py-0.5 text-center text-[11px] font-semibold text-zinc-900"
-                              max={300}
+                              max={Math.round(MAX_IMAGE_SCALE * 100)}
                               min={15}
                               onChange={(e) => {
                                 const parsed = Number(e.target.value)

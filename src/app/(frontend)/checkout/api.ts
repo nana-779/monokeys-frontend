@@ -15,6 +15,12 @@ export type OrderCreateInput = {
   ordererEmail: string
   ordererName?: string
   ordererPhone?: string
+  recipientName?: string
+  recipientPhone?: string
+  postalCode?: string
+  roadAddress?: string
+  detailAddress?: string
+  deliveryMemo?: string
   items: OrderItemInput[]
 }
 

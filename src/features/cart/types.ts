@@ -1,4 +1,5 @@
 export type CartItem = {
+  cartItemId?: number
   productId: string
   slug: string
   name: string

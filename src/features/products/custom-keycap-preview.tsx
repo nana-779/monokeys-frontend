@@ -92,7 +92,7 @@ export function KeyboardMountPreview({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt="커스텀 키캡 장착 미리보기"
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               src={previewDataUrl}
             />
           ) : (

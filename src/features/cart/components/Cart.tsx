@@ -111,7 +111,12 @@ function AddListItem() {
     const {products} = useContext(ProductCartContext);
     return (
         <>
-            {products.map((product : ProductType) => <ListItem key={product.productId} product={product} />)}
+            {products.map((product : ProductType, index: number) => (
+                <ListItem
+                    key={product.cartItemId ? `item-${product.cartItemId}` : `prod-${product.productId}-${index}`}
+                    product={product}
+                />
+            ))}
         </>
     )
 }
@@ -130,9 +135,14 @@ function ListItem({ product } : ProductList) {
             )}
             <div id="Cart-Item-Distance">
                 <div id="Cart-Item-Main">
-                    <p id="Cart-Item-Name">{product.name}</p>
+                    <div className="min-w-0">
+                        <p id="Cart-Item-Name">{product.name}</p>
+                        {product.buildName ? (
+                            <p className="mt-0.5 truncate text-[11px] text-zinc-500">{product.buildName}</p>
+                        ) : null}
+                    </div>
                     <button id="Cart-Item-Remove-Button" type="button" tabIndex={-1} onClick={() => {
-                        handleRemoveProduct(product.productId)
+                        handleRemoveProduct(product.productId, product.cartItemId)
                     }}>
                         <svg id="Cart-Item-Remove_Icon" width="18" height="20" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M16 5L15.1327 17.1425C15.0579 18.1891 14.187 19 13.1378 19H4.86224C3.81296 19 2.94208 18.1891 2.86732 17.1425L2 5M16 5H12M16 5H17M2 5H1M2 5H6M7 9V15M11 9V15M12 5V2C12 1.44772 11.5523 1 11 1H7C6.44772 1 6 1.44772 6 2V5M12 5H6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="#000000"/>
@@ -145,7 +155,7 @@ function ListItem({ product } : ProductList) {
                                 className={`${product.quantity > 1 ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
-                            handleUpdateCount(product.productId, product.quantity - 1);
+                            handleUpdateCount(product.productId, product.quantity - 1, product.cartItemId);
                         }}>
                             <svg width="10" height="1" viewBox="0 0 10 1" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 0.5H9.33333" stroke="currentColor"/>
@@ -158,7 +168,7 @@ function ListItem({ product } : ProductList) {
                                 className={`${product.quantity < product.stockQuantity ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
-                            handleUpdateCount(product.productId, product.quantity + 1);
+                            handleUpdateCount(product.productId, product.quantity + 1, product.cartItemId);
                         }}>
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"     xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 4.66667H4.66667M4.66667 4.66667H9.33333M4.66667 4.66667V0M4.66667 4.66667V9.33333" stroke="currentColor"/>

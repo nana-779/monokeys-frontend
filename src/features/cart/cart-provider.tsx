@@ -9,7 +9,7 @@ import type { ProductType } from "./interface/Product";
 type CartContextValue = {
   items: CartItem[];
   selectedItems: CartItem[];
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem) => Promise<boolean>;
   updateQuantity: (index: number, quantity: number) => void;
   toggleItemSelected: (item: CartItem) => void;
   selectAllItems: (selected: boolean) => void;
@@ -18,6 +18,10 @@ type CartContextValue = {
   openCart: () => void;
   closeCart: () => void;
 };
+
+function getItemSelectionKey(item: Pick<CartItem, "cartItemId" | "productId">) {
+  return item.cartItemId ? `item-${item.cartItemId}` : `prod-${item.productId}`;
+}
 
 const CartContext = createContext<CartContextValue | null>(null);
 
@@ -37,25 +41,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const items = useMemo<CartItem[]>(() => {
     return products.map((p) => ({
+      cartItemId: p.cartItemId,
       productId: String(p.productId),
       slug: String(p.productId),
       name: p.name,
       image: p.thumbnailUrl,
-      optionValue: p.customBuildId ? `custom-${p.customBuildId}` : undefined,
+      optionValue: p.cartItemId
+        ? `item-${p.cartItemId}`
+        : p.customBuildId
+          ? `custom-${p.customBuildId}`
+          : undefined,
       optionLabel: p.buildName || (p.includeAssembly ? '조립 대행 포함' : undefined),
       unitPrice: p.price,
       shippingFee: 0,
       quantity: p.quantity,
+      customDesignData: p.customDesignData,
     }));
   }, [products]);
 
   const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set());
 
   const selectedItems = useMemo(() => {
-    return items.filter((item) => !deselectedIds.has(item.productId));
+    return items.filter((item) => !deselectedIds.has(getItemSelectionKey(item)));
   }, [items, deselectedIds]);
 
-  const addItem = useCallback(async (item: CartItem) => {
+  const addItem = useCallback(async (item: CartItem): Promise<boolean> => {
     if (handleAddProduct) {
       const isSuccess = await handleAddProduct({
         productId: Number(item.productId),
@@ -69,27 +79,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
         customBuildId: 0,
         buildName: item.optionLabel || '',
         includeAssembly: false,
+        customDesignData: item.customDesignData,
       });
       if (isSuccess !== false) {
         setCartOpen(true);
+        return true;
       }
+      return false;
     }
+    return false;
   }, [handleAddProduct]);
 
   const updateQuantity = useCallback((index: number, quantity: number) => {
     const item = items[index];
     if (item && handleUpdateCount) {
-      handleUpdateCount(Number(item.productId), quantity);
+      handleUpdateCount(Number(item.productId), quantity, item.cartItemId);
     }
   }, [items, handleUpdateCount]);
 
   const toggleItemSelected = useCallback((item: CartItem) => {
+    const key = getItemSelectionKey(item);
     setDeselectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(item.productId)) {
-        next.delete(item.productId);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(item.productId);
+        next.add(key);
       }
       return next;
     });
@@ -99,7 +114,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (selected) {
       setDeselectedIds(new Set());
     } else {
-      setDeselectedIds(new Set(items.map((i) => i.productId)));
+      setDeselectedIds(new Set(items.map((i) => getItemSelectionKey(i))));
     }
   }, [items]);
 

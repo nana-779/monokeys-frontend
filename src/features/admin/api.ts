@@ -1,7 +1,5 @@
-import { resolveProductCategory, type StoreProduct } from "@/lib/store-shared";
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_BASE_URL, ApiRequestError } from "@/lib/api-client";
 
-// TODO(담당 5): 관리자 상품 목록, 수정, 삭제 API를 구현합니다.
 type ApiResponse<T> = {
   success: boolean;
   message: string | null;
@@ -9,7 +7,7 @@ type ApiResponse<T> = {
 };
 
 export type AdminProductInput = {
-  categoryName: string;
+  categoryId: string;
   name: string;
   basePrice: number;
   stockQuantity: number;
@@ -26,7 +24,8 @@ export type AdminProductInput = {
 
 export type AdminProductRecord = Omit<AdminProductInput, "thumbnailUrl"> & {
   productId: number;
-  categoryId: string;
+  categoryName: string;
+  parentCategoryId: string;
   thumbnailUrl: string | null;
   active: boolean;
   createdAt: string;
@@ -59,6 +58,28 @@ export async function getAdminProduct(
   return result.data;
 }
 
+export type AdminProductUpdateInput = Omit<
+  AdminProductInput,
+  "thumbnailUrl" | "categoryId" | "isWireless"
+> & {
+  active: boolean;
+  categoryId?: string;
+  isWireless?: boolean;
+};
+
+async function readResponse<T>(response: Response): Promise<T> {
+  let result: ApiResponse<T>;
+  try {
+    result = (await response.json()) as ApiResponse<T>;
+  } catch {
+    throw new Error("서버 응답을 읽을 수 없습니다.");
+  }
+  if (!response.ok || !result.success || result.data == null) {
+    throw new Error(result.message || "상품 요청을 처리할 수 없습니다.");
+  }
+  return result.data;
+}
+
 // 관리자 상품 등록
 export async function createAdminProduct(
   input: AdminProductInput,
@@ -75,19 +96,15 @@ export async function createAdminProduct(
     credentials: "include",
     body,
   });
-  const result = (await response.json()) as ApiResponse<{ productId: number }>;
-  if (!response.ok || !result.success || result.data == null) {
-    throw new Error(result.message || "상품을 등록할 수 없습니다");
-  }
-  return result.data.productId;
+  const product = await readResponse<{ productId: number }>(response);
+  return product.productId;
 }
 
-// 관리자 상품 수정
 export async function updateAdminProduct(
   productId: string,
-  input: AdminProductInput,
+  input: AdminProductUpdateInput,
   image?: File,
-): Promise<StoreProduct> {
+): Promise<AdminProductRecord> {
   const body = new FormData();
   body.append(
     "product",
@@ -96,52 +113,33 @@ export async function updateAdminProduct(
   if (image) body.append("image", image);
   const response = await fetch(
     `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
-    {
-      method: "PATCH",
-      credentials: "include",
-      body,
-    },
+    { method: "PATCH", body, credentials: "include" },
   );
-  const result = (await response.json()) as ApiResponse<{
-    productId: number;
-    categoryName: string;
-    categoryId?: string;
-    name: string;
-    basePrice: number;
-    stockQuantity: number;
-    thumbnailUrl: string | null;
-    description: string | null;
-  }>;
-  if (!response.ok || !result.success || !result.data) {
-    throw new Error(result.message || "상품을 수정할 수 없습니다");
-  }
-  const item = result.data;
-  return {
-    id: item.productId,
-    slug: String(item.productId),
-    name: item.name,
-    basePrice: item.basePrice,
-    category: resolveProductCategory(item.categoryId, item.categoryName),
-    description: item.description ?? "",
-    stockQuantity: item.stockQuantity,
-    shippingFee: 0,
-    brand: "",
-    images: item.thumbnailUrl
-      ? [{ id: item.productId, url: item.thumbnailUrl, alt: item.name }]
-      : [],
-  };
+  return readResponse<AdminProductRecord>(response);
 }
 
 export async function deleteAdminProduct(productId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
-    {
-      method: "DELETE",
-      credentials: "include",
-    },
-  );
-  const result = (await response.json()) as ApiResponse<null>;
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
+      { method: "DELETE", credentials: "include" },
+    );
+  } catch {
+    throw new Error("서버에 연결할 수 없어 삭제 결과를 확인하지 못했습니다. 목록을 새로고침해 주세요.");
+  }
+  let result: ApiResponse<null>;
+  try {
+    result = (await response.json()) as ApiResponse<null>;
+  } catch {
+    throw new ApiRequestError(
+      response.ok
+        ? "서버 응답을 읽을 수 없어 삭제 결과를 확인하지 못했습니다. 목록을 새로고침해 주세요."
+        : "상품을 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+      response.status,
+    );
+  }
   if (!response.ok || !result.success) {
-    throw new Error(result.message || "상품을 삭제할 수 없습니다");
+    throw new ApiRequestError(result.message || "상품을 삭제할 수 없습니다.", response.status);
   }
 }

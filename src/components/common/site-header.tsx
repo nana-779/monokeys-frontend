@@ -2,13 +2,37 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { CloseIcon } from '@/components/icons'
 import type { ApiUser } from '@/features/auth/api'
 import { getPaginatedProducts, getSearchSuggestions } from '@/features/products/api'
 import { formatPrice, mediaFrom, type StoreProduct } from '@/lib/store-shared'
 
 const RECENT_SEARCH_KEY = 'monokeys_recent_searches'
+
+function highlightMatches(text: string, query: string): ReactNode {
+  const tokens = Array.from(
+    new Set(
+      query
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 5),
+    ),
+  )
+  if (tokens.length === 0 || !text) return text
+  const escaped = tokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const regex = new RegExp(`(${escaped.join('|')})`, 'gi')
+  return text.split(regex).map((part, idx) =>
+    idx % 2 === 1 ? (
+      <mark className="rounded-xs bg-amber-100 px-0.5 font-semibold text-zinc-950" key={idx}>
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  )
+}
 
 type SubCategoryItem = {
   name: string
@@ -93,6 +117,13 @@ export function SiteHeader({
   const [previewTotal, setPreviewTotal] = useState(0)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+
+  const closeSearchOverlay = useCallback(() => {
+    setSearchOpen(false)
+    setQuery('')
+    setActiveIndex(-1)
+  }, [])
 
   useEffect(() => {
     try {
@@ -163,17 +194,23 @@ export function SiteHeader({
 
   useEffect(() => {
     if (!searchOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setSearchOpen(false)
+        closeSearchOverlay()
       }
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [searchOpen])
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [closeSearchOverlay, searchOpen])
 
   useEffect(() => {
     if (!searchOpen) return
+    setActiveIndex(-1)
     const trimmed = query.trim()
     if (!trimmed) {
       setPreviewItems([])
@@ -213,7 +250,7 @@ export function SiteHeader({
 
   const executeSearch = (rawKeyword: string) => {
     const trimmed = rawKeyword.trim()
-    setSearchOpen(false)
+    closeSearchOverlay()
     if (!trimmed) {
       router.push('/products')
       return
@@ -224,7 +261,25 @@ export function SiteHeader({
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (activeIndex >= 0 && previewItems[activeIndex]) {
+      const chosen = previewItems[activeIndex]
+      saveRecentKeyword(query)
+      closeSearchOverlay()
+      router.push(`/products/${chosen.id}`)
+      return
+    }
     executeSearch(query)
+  }
+
+  const handleSearchInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing || previewItems.length === 0) return
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActiveIndex((prev) => (prev < previewItems.length - 1 ? prev + 1 : 0))
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1))
+    }
   }
 
   return (
@@ -310,11 +365,16 @@ export function SiteHeader({
       )}
 
       {searchOpen && (
-        <div className="fixed inset-0 z-[70] overflow-y-auto bg-white/95 px-6 pb-16 pt-[min(14vh,120px)] backdrop-blur">
+        <div
+          className="fixed inset-0 z-[70] overflow-y-auto bg-white/95 px-6 pb-16 pt-[min(14vh,120px)] backdrop-blur"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSearchOverlay()
+          }}
+        >
           <button
             aria-label="검색 닫기"
             className="fixed right-8 top-8 rounded-full border border-zinc-200 bg-white p-2 shadow-xs hover:border-zinc-400"
-            onClick={() => setSearchOpen(false)}
+            onClick={closeSearchOverlay}
             type="button"
           >
             <CloseIcon />
@@ -332,6 +392,7 @@ export function SiteHeader({
                 className="min-w-0 flex-1 bg-transparent text-2xl outline-none placeholder:text-zinc-300 sm:text-4xl"
                 id="store-search"
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleSearchInputKeyDown}
                 placeholder="찾으시는 상품을 검색하세요"
                 type="search"
                 value={query}
@@ -339,7 +400,10 @@ export function SiteHeader({
               {query && (
                 <button
                   className="shrink-0 text-sm text-zinc-500 hover:text-zinc-900"
-                  onClick={() => setQuery('')}
+                  onClick={() => {
+                    setQuery('')
+                    setActiveIndex(-1)
+                  }}
                   type="button"
                 >
                   지우기
@@ -447,28 +511,39 @@ export function SiteHeader({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
                       <span>총 {previewTotal}개의 검색 결과</span>
-                      <button
-                        className="font-semibold text-zinc-900 underline-offset-4 hover:underline"
-                        onClick={() => executeSearch(query)}
-                        type="button"
-                      >
-                        전체 결과 보기 →
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <span className="hidden text-[11px] text-zinc-400 sm:inline">
+                          ↑↓ 이동 · Enter 선택 · ESC 닫기
+                        </span>
+                        <button
+                          className="font-semibold text-zinc-900 underline-offset-4 hover:underline"
+                          onClick={() => executeSearch(query)}
+                          type="button"
+                        >
+                          전체 결과 보기 →
+                        </button>
+                      </div>
                     </div>
                     <ul className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-                      {previewItems.map((item) => {
+                      {previewItems.map((item, idx) => {
                         const image = mediaFrom(item.images[0])
+                        const isHighlighted = idx === activeIndex
                         return (
                           <li key={item.id}>
                             <Link
-                              className="flex items-center gap-3.5 rounded-xl border border-zinc-200 bg-white p-2.5 transition hover:border-zinc-950"
+                              className={`flex items-center gap-3.5 rounded-xl border p-2.5 transition ${
+                                isHighlighted
+                                  ? 'border-zinc-950 bg-zinc-50 ring-1 ring-zinc-950'
+                                  : 'border-zinc-200 bg-white hover:border-zinc-950'
+                              }`}
                               href={`/products/${item.id}`}
                               onClick={() => {
                                 saveRecentKeyword(query)
-                                setSearchOpen(false)
+                                closeSearchOverlay()
                               }}
+                              onMouseEnter={() => setActiveIndex(idx)}
                             >
                               <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
                                 {image?.url ? (
@@ -486,10 +561,10 @@ export function SiteHeader({
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium text-zinc-950">
-                                  {item.name}
+                                  {highlightMatches(item.name, query)}
                                 </p>
                                 <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                                  {item.subCategoryName || item.brand}
+                                  {highlightMatches(item.subCategoryName || item.brand, query)}
                                 </p>
                               </div>
                               <span className="shrink-0 text-xs font-semibold text-zinc-900">

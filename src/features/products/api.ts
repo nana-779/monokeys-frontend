@@ -36,6 +36,8 @@ export async function getPaginatedProducts(
   const search = new URLSearchParams()
   if (params.categoryId && params.categoryId !== 'all') search.set('category', params.categoryId)
   if (params.subcategoryId) search.set('subcategory', params.subcategoryId)
+  if (params.keyword && params.keyword.trim()) search.set('keyword', params.keyword.trim())
+  if (params.sort && params.sort !== 'default') search.set('sort', params.sort)
   if (params.page !== undefined) search.set('page', String(params.page))
   if (params.size !== undefined) search.set('size', String(params.size))
 

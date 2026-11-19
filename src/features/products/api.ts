@@ -9,8 +9,8 @@ type ProductApiEnvelope<T> = {
 }
 
 // 백엔드 ApiResponse({ success, message, data }) 래핑과 비래핑 JSON을 모두 지원합니다.
-async function productRequest<T>(path: string): Promise<T> {
-  const result = await apiRequest<T | ProductApiEnvelope<T>>(path)
+async function productRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const result = await apiRequest<T | ProductApiEnvelope<T>>(path, init)
   if (result && typeof result === 'object' && !Array.isArray(result) && 'success' in result) {
     if (result.success !== true) {
       throw new Error(result.message || '상품 정보를 불러올 수 없습니다.')
@@ -28,10 +28,12 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 /**
- * DB 재고·찜·주문 기반 실시간 추천 검색어 조회
+ * DB 재고·찜·주문 기반 실시간 추천 검색어 조회 (요청마다 캐시 없이 새 조합 수신)
  */
 export async function getSearchSuggestions(limit = 6): Promise<string[]> {
-  return await productRequest<string[]>(`/api/products/search-suggestions?limit=${limit}`)
+  return await productRequest<string[]>(`/api/products/search-suggestions?limit=${limit}`, {
+    cache: 'no-store',
+  })
 }
 
 /**

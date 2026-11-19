@@ -6,6 +6,11 @@ export type ApiUser = {
   id: string | number
   email: string
   role: 'admin' | 'user'
+  name?: string | null
+  phone?: string | null
+  postalCode?: string | null
+  roadAddress?: string | null
+  detailAddress?: string | null
 }
 
 // 백엔드 응답 형식(팀 ApiResponse): { success, message, data: { user: { id, email, role } } }

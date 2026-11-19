@@ -1,3 +1,4 @@
+import { ApiRequestError } from "@/lib/api-client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   createAdminProduct,
@@ -18,7 +19,6 @@ import type { Category } from "@/features/products/types";
 import { ProductImage } from "@/components/common/product-image";
 
 type View = "register" | "list" | "edit";
-type DialogType = "delete-all" | "delete-selected" | null;
 type IconName =
   | "box"
   | "plus"
@@ -1237,7 +1237,8 @@ function ProductList({
   onDelete,
   loading,
   error,
-  onDialog,
+  onDeleteSelected,
+  deleting,
   onRegister,
 }: {
   categories: Category[];
@@ -1247,9 +1248,11 @@ function ProductList({
   onDelete: (product: AdminProductRecord) => void;
   loading: boolean;
   error: string;
-  onDialog: (type: DialogType) => void;
+  onDeleteSelected: (products: AdminProductRecord[]) => Promise<void>;
+  deleting: boolean;
   onRegister: () => void;
 }) {
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [subcategoryFilter, setSubcategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">(
@@ -1263,6 +1266,13 @@ function ProductList({
       statusFilter === "" || product.active === (statusFilter === "active");
     return matchesCategory && matchesStatus;
   });
+
+  // 필터로 숨겨진 상품은 선택삭제 대상에 포함하지 않습니다.
+  const selectedProducts = filteredProducts.filter((product) => selectedIds.includes(product.productId));
+  const allSelected = filteredProducts.length > 0 && selectedProducts.length === filteredProducts.length;
+  const toggleSelection = (id: number, checked: boolean) => {
+    setSelectedIds((current) => checked ? [...current, id] : current.filter((value) => value !== id));
+  };
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
@@ -1338,21 +1348,13 @@ function ProductList({
           </p>
           <div className="flex items-center gap-2">
             <button
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 px-3 text-xs font-semibold text-zinc-400 disabled:cursor-not-allowed disabled:bg-zinc-50"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
-              disabled
-              onClick={() => onDialog("delete-selected")}
+              disabled={deleting || loading || selectedProducts.length === 0}
+              onClick={() => void onDeleteSelected(selectedProducts)}
             >
               <Icon name="trash" size={15} />
-              선택 삭제
-            </button>
-            <button
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 text-xs font-semibold text-red-600 transition hover:bg-red-50"
-              type="button"
-              onClick={() => onDialog("delete-all")}
-            >
-              <Icon name="trash" size={15} />
-              전체 삭제
+              {deleting ? "삭제 중..." : `선택 삭제 (${selectedProducts.length})`}
             </button>
           </div>
         </div>
@@ -1367,7 +1369,10 @@ function ProductList({
                   aria-label="표시된 상품 전체 선택"
                   className="h-4 w-4 rounded border-zinc-300 accent-zinc-900"
                   type="checkbox"
-                  disabled
+                  checked={allSelected}
+                  ref={(element) => { if (element) element.indeterminate = selectedProducts.length > 0 && !allSelected; }}
+                  disabled={deleting || loading || filteredProducts.length === 0}
+                  onChange={(event) => setSelectedIds(event.target.checked ? filteredProducts.map((product) => product.productId) : [])}
                 />
               </th>
               <th className="px-3 py-3.5">상품 이미지</th>
@@ -1391,6 +1396,9 @@ function ProductList({
                     aria-label={`${product.name} 선택`}
                     className="h-4 w-4 rounded border-zinc-300 accent-zinc-900"
                     type="checkbox"
+                    checked={selectedIds.includes(product.productId)}
+                    disabled={deleting || loading}
+                    onChange={(event) => toggleSelection(product.productId, event.target.checked)}
                   />
                 </td>
                 <td className="px-3 py-3">
@@ -1432,6 +1440,7 @@ function ProductList({
                     <button
                       className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                       type="button"
+                      disabled={deleting || loading}
                       onClick={() => onDelete(product)}
                     >
                       삭제
@@ -1598,72 +1607,6 @@ function ProductDetailDialog({
   );
 }
 
-function ConfirmDialog({
-  type,
-  onClose,
-}: {
-  type: Exclude<DialogType, null>;
-  onClose: () => void;
-}) {
-  const isAll = type === "delete-all";
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 p-4 backdrop-blur-[2px]"
-      role="presentation"
-      onMouseDown={(event) => event.currentTarget === event.target && onClose()}
-    >
-      <div
-        aria-labelledby="dialog-title"
-        aria-modal="true"
-        className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
-        role="dialog"
-      >
-        <div className="flex items-start justify-between">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
-            <Icon name="alert" size={22} />
-          </span>
-          <button
-            aria-label="대화상자 닫기"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-            onClick={onClose}
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <h2 id="dialog-title" className="mt-5 text-lg font-bold text-zinc-900">
-          {isAll ? "모든 상품을 삭제할까요?" : "선택한 상품을 삭제할까요?"}
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-500">
-          {isAll
-            ? "등록된 모든 상품이 영구 삭제되며 되돌릴 수 없습니다. 현재 삭제할 상품이 없습니다."
-            : "선택한 상품은 영구 삭제되며 되돌릴 수 없습니다."}
-        </p>
-        {isAll && (
-          <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3.5 py-3 text-xs font-medium leading-5 text-red-700">
-            전체 삭제를 진행하려면 명시적인 확인이 필요합니다.
-          </div>
-        )}
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            className="h-10 rounded-lg border border-zinc-200 px-4 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50"
-            onClick={onClose}
-          >
-            취소
-          </button>
-          <button
-            className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isAll}
-            title={isAll ? "삭제할 상품이 없습니다" : undefined}
-            onClick={onClose}
-          >
-            {isAll ? "모든 상품 삭제" : "상품 삭제"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminDashboard({
   previewMode = false,
 }: {
@@ -1671,7 +1614,8 @@ export default function AdminDashboard({
 }) {
   const [view, setView] = useState<View>("register");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [dialog, setDialog] = useState<DialogType>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteInProgress = useRef(false);
   const [toast, setToast] = useState("");
   const [products, setProducts] = useState<AdminProductRecord[]>([]);
   const [editingProduct, setEditingProduct] = useState<AdminProductRecord>();
@@ -1752,16 +1696,49 @@ export default function AdminDashboard({
     }
   };
 
-  const deleteProduct = async (product: AdminProductRecord) => {
-    if (!window.confirm(`'${product.name}' 상품을 삭제하시겠습니까?`)) return;
+  const deleteProducts = async (targets: AdminProductRecord[]) => {
+    if (targets.length === 0 || deleteInProgress.current) return;
+    const names = targets.map((product) => product.name).join(", ");
+    if (!window.confirm(
+      `${targets.length}개 상품을 정말 삭제하시겠습니까?\n${names}\n삭제 후에는 상품목록에서 볼 수 없으며, 관리자 화면에서 복구할 수 없습니다.`,
+    )) return;
+
+    deleteInProgress.current = true;
+    setDeleting(true);
+    let deletedCount = 0;
+    let missingCount = 0;
+    const removedIds = new Set<number>();
+    const failures: string[] = [];
     try {
-      await deleteAdminProduct(String(product.productId));
-      setProducts(await getAdminProducts());
-      showToast("상품을 삭제 처리했습니다.");
-    } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : "상품을 삭제할 수 없습니다.",
-      );
+      // 기존 단건 API를 사용하며 각 상품의 처리 결과를 따로 기록합니다.
+      for (const product of targets) {
+        try {
+          await deleteAdminProduct(String(product.productId));
+          deletedCount++;
+          removedIds.add(product.productId);
+        } catch (error) {
+          if (error instanceof ApiRequestError && error.status === 404) {
+            missingCount++;
+            removedIds.add(product.productId);
+          } else {
+            failures.push(`${product.name}: ${error instanceof Error ? error.message : "삭제 실패"}`);
+          }
+        }
+      }
+      setProducts((current) => current.filter((product) => !removedIds.has(product.productId)));
+      const results = [`${deletedCount}개 삭제 완료`];
+      if (missingCount) results.push(`${missingCount}개는 이미 삭제되었거나 없는 상품입니다`);
+      if (failures.length) results.push(`${failures.length}개 처리 실패 또는 결과 미확인 — ${failures.join(" / ")}`);
+      try {
+        setProducts(await getAdminProducts());
+        setListError("");
+      } catch {
+        results.push("목록을 새로 불러오지 못했습니다. 새로고침해 주세요");
+      }
+      showToast(results.join(". "));
+    } finally {
+      deleteInProgress.current = false;
+      setDeleting(false);
     }
   };
 
@@ -1948,8 +1925,9 @@ export default function AdminDashboard({
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               onDetail={showProductDetails}
-              onDelete={deleteProduct}
-              onDialog={setDialog}
+              onDelete={(product) => void deleteProducts([product])}
+              onDeleteSelected={deleteProducts}
+              deleting={deleting}
               onRegister={() => navigate("register")}
             />
           ) : view === "edit" && editingProduct ? (
@@ -1983,9 +1961,6 @@ export default function AdminDashboard({
         </main>
       </div>
 
-      {dialog && (
-        <ConfirmDialog type={dialog} onClose={() => setDialog(null)} />
-      )}
       {detailProduct && (
         <ProductDetailDialog
           categories={categories}

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_BASE_URL, ApiRequestError } from "@/lib/api-client";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -119,15 +119,27 @@ export async function updateAdminProduct(
 }
 
 export async function deleteAdminProduct(productId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
-    {
-      method: "DELETE",
-      credentials: "include",
-    },
-  );
-  const result = (await response.json()) as ApiResponse<null>;
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/api/admin/products/${encodeURIComponent(productId)}`,
+      { method: "DELETE", credentials: "include" },
+    );
+  } catch {
+    throw new Error("서버에 연결할 수 없어 삭제 결과를 확인하지 못했습니다. 목록을 새로고침해 주세요.");
+  }
+  let result: ApiResponse<null>;
+  try {
+    result = (await response.json()) as ApiResponse<null>;
+  } catch {
+    throw new ApiRequestError(
+      response.ok
+        ? "서버 응답을 읽을 수 없어 삭제 결과를 확인하지 못했습니다. 목록을 새로고침해 주세요."
+        : "상품을 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+      response.status,
+    );
+  }
   if (!response.ok || !result.success) {
-    throw new Error(result.message || "상품을 삭제할 수 없습니다");
+    throw new ApiRequestError(result.message || "상품을 삭제할 수 없습니다.", response.status);
   }
 }

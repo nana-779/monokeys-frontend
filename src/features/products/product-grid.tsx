@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition, type FormEvent } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { BackendErrorState } from '@/components/common/backend-error-state'
 import { ProductCard } from '@/components/common/product-card'
@@ -26,7 +26,6 @@ export function ProductGrid() {
   const pageParam = parseInt(searchParams.get('page') || '0', 10)
   const currentPage = isNaN(pageParam) ? 0 : pageParam
 
-  const [keywordInput, setKeywordInput] = useState(currentKeyword)
   const [products, setProducts] = useState<StoreProduct[]>([])
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
@@ -34,10 +33,6 @@ export function ProductGrid() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
-
-  useEffect(() => {
-    setKeywordInput(currentKeyword)
-  }, [currentKeyword])
 
   // URL 파라미터가 바뀔 때마다 백엔드 API에서 실시간 데이터 로드
   useEffect(() => {
@@ -114,14 +109,7 @@ export function ProductGrid() {
 
   // 검색어 제거
   const handleClearKeyword = () => {
-    setKeywordInput('')
     pushQueryUpdate({ keyword: null, page: 0 })
-  }
-
-  // 인라인 검색 실행
-  const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    pushQueryUpdate({ keyword: keywordInput, page: 0 })
   }
 
   // 페이지 이동
@@ -132,68 +120,38 @@ export function ProductGrid() {
 
   return (
     <div>
-      {/* 상단 검색 · 정렬 · 활성 필터 바 */}
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5">
-        <form
-          className="flex min-w-[240px] flex-1 max-w-md items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 focus-within:border-zinc-950"
-          onSubmit={handleSearchSubmit}
-        >
-          <input
-            aria-label="상품 목록 내 검색"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
-            onChange={(e) => setKeywordInput(e.target.value)}
-            placeholder="상품명, 스위치, 재질(PBT/알루미늄), 배열(65%) 검색"
-            type="search"
-            value={keywordInput}
-          />
-          {keywordInput && (
-            <button
-              aria-label="입력한 검색어 지우기"
-              className="text-xs text-zinc-400 hover:text-zinc-900"
-              onClick={handleClearKeyword}
-              type="button"
-            >
-              지우기
-            </button>
+      {/* 상단 활성 필터 · 정렬 · 총 개수 바 (검색 입력은 헤더 SEARCH에만 위치) */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
+        <div className="flex flex-wrap items-center gap-2">
+          {currentSubcategory && (
+            <span className="inline-flex items-center gap-1.5 rounded bg-zinc-100 px-2.5 py-1 text-zinc-800">
+              <span>서브: {currentSubcategory}</span>
+              <button
+                aria-label="서브카테고리 필터 제거"
+                className="font-bold hover:text-black"
+                onClick={handleClearSubcategory}
+                type="button"
+              >
+                ×
+              </button>
+            </span>
           )}
-          <button
-            className="rounded bg-zinc-950 px-3 py-1 text-xs font-semibold text-white hover:bg-zinc-800"
-            type="submit"
-          >
-            검색
-          </button>
-        </form>
+          {currentKeyword && (
+            <span className="inline-flex items-center gap-1.5 rounded bg-zinc-950 px-2.5 py-1 font-medium text-white">
+              <span>검색: &ldquo;{currentKeyword}&rdquo;</span>
+              <button
+                aria-label="검색어 필터 제거"
+                className="font-bold text-zinc-300 hover:text-white"
+                onClick={handleClearKeyword}
+                type="button"
+              >
+                ×
+              </button>
+            </span>
+          )}
+        </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-          <div className="flex flex-wrap items-center gap-2">
-            {currentSubcategory && (
-              <span className="inline-flex items-center gap-1.5 rounded bg-zinc-100 px-2.5 py-1 text-zinc-800">
-                <span>서브: {currentSubcategory}</span>
-                <button
-                  aria-label="서브카테고리 필터 제거"
-                  className="font-bold hover:text-black"
-                  onClick={handleClearSubcategory}
-                  type="button"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {currentKeyword && (
-              <span className="inline-flex items-center gap-1.5 rounded bg-zinc-950 px-2.5 py-1 font-medium text-white">
-                <span>검색: &ldquo;{currentKeyword}&rdquo;</span>
-                <button
-                  aria-label="검색어 필터 제거"
-                  className="font-bold text-zinc-300 hover:text-white"
-                  onClick={handleClearKeyword}
-                  type="button"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-          </div>
-
+        <div className="flex items-center gap-3">
           <select
             aria-label="상품 정렬"
             className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-800 outline-none focus:border-zinc-950"
@@ -206,8 +164,7 @@ export function ProductGrid() {
               </option>
             ))}
           </select>
-
-          <span className="font-medium text-zinc-700">총 {totalElements}개 상품</span>
+          <span>총 {totalElements}개 상품</span>
         </div>
       </div>
 

@@ -234,19 +234,22 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
       const textItem = textLayers.find((t) => t.id === target.id)
       if (!textItem || !textItem.text.trim()) return null
 
+      const lines = textItem.text.split(/\r?\n/)
+      const lineHeight = textItem.fontSize * 1.24
+      const strokePad = (textItem.strokeWidth ?? 0) * 2
       const ctx = targetCanvas?.getContext('2d') ?? canvasRef.current?.getContext('2d')
-      let textW = textItem.text.length * textItem.fontSize * 0.65
+      let textW = lines.reduce((max, line) => Math.max(max, line.length), 0) * textItem.fontSize * 0.65
       if (ctx) {
         ctx.save()
         ctx.font = `700 ${textItem.fontSize}px ${textItem.fontFamily}`
-        textW = ctx.measureText(textItem.text).width
+        textW = lines.reduce((max, line) => Math.max(max, ctx.measureText(line || ' ').width), 0)
         ctx.restore()
       }
       return {
         cx: BLEED_PAD + bodyW * textItem.x,
         cy: BLEED_PAD + bodyH * textItem.y,
-        width: Math.max(36, textW + 18),
-        height: Math.max(28, textItem.fontSize * 1.3),
+        width: Math.max(36, textW + strokePad + 18),
+        height: Math.max(28, lines.length * lineHeight + strokePad + 8),
         rotationRad: (textItem.rotation * Math.PI) / 180,
       }
     },
@@ -300,15 +303,31 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
       const drawTexts = () => {
         for (const t of textLayers) {
           if (!t.text.trim()) continue
+          const lines = t.text.split(/\r?\n/)
+          const lineHeight = t.fontSize * 1.24
+          const startY = -((lines.length - 1) * lineHeight) / 2
+          const strokeWidth = t.strokeWidth ?? 0
+
           ctx.save()
           ctx.translate(BLEED_PAD + bodyW * t.x, BLEED_PAD + bodyH * t.y)
           ctx.rotate((t.rotation * Math.PI) / 180)
           ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1)
           ctx.font = `700 ${t.fontSize}px ${t.fontFamily}`
-          ctx.fillStyle = t.color
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(t.text, 0, 0)
+
+          lines.forEach((line, index) => {
+            const lineY = startY + index * lineHeight
+            if (strokeWidth > 0) {
+              ctx.strokeStyle = t.strokeColor ?? '#ffffff'
+              ctx.lineWidth = strokeWidth * 2
+              ctx.lineJoin = 'round'
+              ctx.miterLimit = 2
+              ctx.strokeText(line, 0, lineY)
+            }
+            ctx.fillStyle = t.color
+            ctx.fillText(line, 0, lineY)
+          })
           ctx.restore()
         }
       }
@@ -321,20 +340,59 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
         drawTexts()
       }
 
-      // 윗면 경사 입체감 테두리
-      ctx.strokeStyle = isDarkHex(backgroundColor)
-        ? 'rgba(255, 255, 255, 0.22)'
-        : 'rgba(0, 0, 0, 0.08)'
-      ctx.lineWidth = 2
-      drawRoundedRectPath(
-        ctx,
-        BLEED_PAD + meta.safeInsetX - 10,
-        BLEED_PAD + meta.safeInsetY - 10,
-        bodyW - (meta.safeInsetX - 10) * 2,
-        bodyH - (meta.safeInsetY - 10) * 2,
-        12,
-      )
-      ctx.stroke()
+      // 윗면 경사 입체감 (에디터 화면/가이드 미리보기에서만 표시해 인쇄 원본 PNG는 깨끗하게 유지)
+      if (includeGuides) {
+        const darkBg = isDarkHex(backgroundColor)
+        const topX = BLEED_PAD + meta.safeInsetX - 10
+        const topY = BLEED_PAD + meta.safeInsetY - 12
+        const topW = bodyW - (meta.safeInsetX - 10) * 2
+        const topH = bodyH - (meta.safeInsetY - 10) * 2
+
+        // 상단 림 하이라이트 & 하단 스커트 음영
+        const bottomShade = ctx.createLinearGradient(0, topY + topH, 0, BLEED_PAD + bodyH)
+        bottomShade.addColorStop(0, 'rgba(0, 0, 0, 0)')
+        bottomShade.addColorStop(1, darkBg ? 'rgba(0, 0, 0, 0.34)' : 'rgba(0, 0, 0, 0.14)')
+        ctx.fillStyle = bottomShade
+        ctx.fillRect(BLEED_PAD, topY + topH, bodyW, BLEED_PAD + bodyH - (topY + topH))
+
+        const topShade = ctx.createLinearGradient(0, BLEED_PAD, 0, topY)
+        topShade.addColorStop(0, darkBg ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.45)')
+        topShade.addColorStop(1, 'rgba(255, 255, 255, 0)')
+        ctx.fillStyle = topShade
+        ctx.fillRect(BLEED_PAD, BLEED_PAD, bodyW, topY - BLEED_PAD)
+
+        // 좌·우 스커트 경사 음영
+        const leftShade = ctx.createLinearGradient(BLEED_PAD, 0, topX, 0)
+        leftShade.addColorStop(0, darkBg ? 'rgba(0, 0, 0, 0.24)' : 'rgba(0, 0, 0, 0.08)')
+        leftShade.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        ctx.fillStyle = leftShade
+        ctx.fillRect(BLEED_PAD, BLEED_PAD, topX - BLEED_PAD, bodyH)
+
+        const rightShade = ctx.createLinearGradient(topX + topW, 0, BLEED_PAD + bodyW, 0)
+        rightShade.addColorStop(0, 'rgba(0, 0, 0, 0)')
+        rightShade.addColorStop(1, darkBg ? 'rgba(0, 0, 0, 0.24)' : 'rgba(0, 0, 0, 0.08)')
+        ctx.fillStyle = rightShade
+        ctx.fillRect(topX + topW, BLEED_PAD, BLEED_PAD + bodyW - (topX + topW), bodyH)
+
+        // OEM 4모서리 대각선 베벨 엣지 + 윗면 타건부 테두리
+        ctx.strokeStyle = darkBg ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.12)'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(BLEED_PAD + 8, BLEED_PAD + 8)
+        ctx.lineTo(topX + 6, topY + 6)
+        ctx.moveTo(BLEED_PAD + bodyW - 8, BLEED_PAD + 8)
+        ctx.lineTo(topX + topW - 6, topY + 6)
+        ctx.moveTo(BLEED_PAD + 8, BLEED_PAD + bodyH - 8)
+        ctx.lineTo(topX + 6, topY + topH - 6)
+        ctx.moveTo(BLEED_PAD + bodyW - 8, BLEED_PAD + bodyH - 8)
+        ctx.lineTo(topX + topW - 6, topY + topH - 6)
+        ctx.stroke()
+
+        ctx.strokeStyle = darkBg ? 'rgba(255, 255, 255, 0.26)' : 'rgba(0, 0, 0, 0.14)'
+        ctx.lineWidth = 2
+        drawRoundedRectPath(ctx, topX, topY, topW, topH, 12)
+        ctx.stroke()
+      }
       ctx.restore()
 
       // 3) 편집용 가이드선 (검정 블리드선 + 초록 안전영역) & 빈 캔버스 안내 워터마크
@@ -1027,8 +1085,7 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
     setSubmitting(true)
     try {
       const printBlob = await exportCanvasBlob(false)
-      const previewBlob = await exportCanvasBlob(false)
-      const uploaded = await uploadCustomKeycapImages(printBlob, previewBlob)
+      const uploaded = await uploadCustomKeycapImages(printBlob)
 
       const primaryText = nonEmptyTexts[0] ?? null
       const designPayload = {
@@ -1048,6 +1105,8 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
           color: t.color,
           fontSize: t.fontSize,
           rotation: t.rotation,
+          strokeColor: t.strokeColor ?? '#ffffff',
+          strokeWidth: t.strokeWidth ?? 0,
         })),
       }
 
@@ -1474,16 +1533,21 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
                   </div>
 
                   <label className="block">
-                    <span className="mb-1 block font-medium text-zinc-700">문구 입력</span>
-                    <input
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                      maxLength={30}
+                    <span className="mb-1 flex items-center justify-between font-medium text-zinc-700">
+                      <span>문구 입력</span>
+                      <span className="text-[11px] font-normal text-zinc-400">
+                        Enter 줄바꿈 · {activeTextLayer.text.length}/60
+                      </span>
+                    </span>
+                    <textarea
+                      className="w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm leading-snug outline-none focus:border-zinc-900"
+                      maxLength={60}
                       onChange={(e) => {
                         setSelection({ kind: 'text', id: activeTextLayer.id })
                         updateSelectedText({ text: e.target.value })
                       }}
-                      placeholder="예: ESC, MY KEY"
-                      type="text"
+                      placeholder={'예: ESC\nMY KEY'}
+                      rows={2}
                       value={activeTextLayer.text}
                     />
                   </label>
@@ -1511,6 +1575,50 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
                       type="color"
                       value={activeTextLayer.color}
                     />
+                  </div>
+
+                  <div className="space-y-1.5 rounded-lg border border-zinc-200 bg-white p-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-zinc-700">
+                        글자 외곽선 (사진 위 가독성)
+                      </span>
+                      <input
+                        aria-label="글자 외곽선 색상"
+                        className="h-7 w-10 cursor-pointer rounded border border-zinc-300 bg-white p-0.5"
+                        onChange={(e) =>
+                          updateSelectedText({
+                            strokeColor: e.target.value,
+                            strokeWidth:
+                              (activeTextLayer.strokeWidth ?? 0) === 0
+                                ? 2
+                                : activeTextLayer.strokeWidth,
+                          })
+                        }
+                        type="color"
+                        value={activeTextLayer.strokeColor ?? '#ffffff'}
+                      />
+                    </div>
+                    <label className="block">
+                      <span className="mb-1 flex justify-between text-[11px] text-zinc-500">
+                        <span>외곽선 두께</span>
+                        <span>
+                          {(activeTextLayer.strokeWidth ?? 0) === 0
+                            ? '없음'
+                            : `${activeTextLayer.strokeWidth}px`}
+                        </span>
+                      </span>
+                      <input
+                        className="w-full"
+                        max={6}
+                        min={0}
+                        onChange={(e) =>
+                          updateSelectedText({ strokeWidth: Number(e.target.value) })
+                        }
+                        step={0.5}
+                        type="range"
+                        value={activeTextLayer.strokeWidth ?? 0}
+                      />
+                    </label>
                   </div>
 
                   <label className="block">

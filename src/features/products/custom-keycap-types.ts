@@ -30,6 +30,8 @@ export interface TextLayerState {
   rotation: number
   flipX: boolean
   flipY: boolean
+  strokeColor?: string
+  strokeWidth?: number
 }
 
 export interface SerializedImageDraft {
@@ -138,6 +140,8 @@ export function createTextLayer(index: number, initialText = ''): TextLayerState
     rotation: 0,
     flipX: false,
     flipY: false,
+    strokeColor: '#ffffff',
+    strokeWidth: 0,
   }
 }
 

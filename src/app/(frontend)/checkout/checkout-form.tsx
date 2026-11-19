@@ -43,7 +43,6 @@ export function CheckoutForm() {
   // DB에 저장된 회원 정보(이름, 전화번호, 기본 배송지)를 기본값으로 불러옵니다.
   useEffect(() => {
     getCurrentUser().then(({ user }) => {
-      if (user?.email) setUserEmail(user.email)
       if (user) {
         defaultUserInfoRef.current = {
           email: user.email || null,
@@ -54,6 +53,7 @@ export function CheckoutForm() {
           detailAddress: user.detailAddress || null,
         }
       }
+      if (user?.email) setUserEmail(user.email)
       if (user?.name) setRecipientName(user.name)
       if (user?.phone) setPhone(user.phone)
       if (user?.postalCode) setPostalCode(user.postalCode)

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  useContext,
   useEffect,
   useState,
   type FormEvent,
@@ -19,6 +20,8 @@ import {
 import { useCart } from "@/features/cart/cart-provider";
 import { WithdrawalSessionContext } from "@/features/user/withdrawal-session";
 import { ApiRequestError } from "@/lib/api-client";
+import { ProductCartContext } from "@/features/cart/components/CartContext";
+import { ProductType } from "@/features/cart/interface/Product";
 
 type AppUser = ApiUser;
 
@@ -26,9 +29,11 @@ type AppUser = ApiUser;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function StoreShell({ children }: { children: ReactNode }) {
+  const { products, refreshCart, setProducts } = useContext(ProductCartContext);
+  const { openCart, closeCart, clearCart } = useCart();
+
   const pathname = usePathname();
   const router = useRouter();
-  const { items, openCart, closeCart, clearCart } = useCart();
   const [sessionVersion, setSessionVersion] = useState(0);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -116,6 +121,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
     try {
       const { user } = await logIn(email, password);
       setAuthUser(user);
+      // 로그인한 회원의 장바구니를 서버에서 다시 불러와 헤더 개수에 반영
+      refreshCart();
       setSessionVersion(v => v + 1);
       setAuthOpen(false);
     } catch (error) {
@@ -139,6 +146,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
     try {
       await logOut();
       setAuthUser(null);
+      // 로그아웃하면 화면에 남아 있던 장바구니(헤더 개수 포함)를 비움
+      setProducts([]);
       setAuthOpen(false);
       router.replace("/");
     } catch {
@@ -148,10 +157,15 @@ export function StoreShell({ children }: { children: ReactNode }) {
     }
   };
 
+  const cartCount = products.reduce(
+    (total : any, product : ProductType) => total + product.quantity,
+    0
+  );
+
   return (
     <>
       <SiteHeader
-        cartCount={items.length}
+        cartCount={cartCount}
         onOpenAccount={openAccount}
         onOpenCart={() => {
           setAuthOpen(false);

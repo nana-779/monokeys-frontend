@@ -28,6 +28,13 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 /**
+ * DB 재고·찜·주문 기반 실시간 추천 검색어 조회
+ */
+export async function getSearchSuggestions(limit = 6): Promise<string[]> {
+  return await productRequest<string[]>(`/api/products/search-suggestions?limit=${limit}`)
+}
+
+/**
  * 페이징 및 소분류 필터링을 지원하는 상품 목록 조회
  */
 export async function getPaginatedProducts(

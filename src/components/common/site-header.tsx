@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { CloseIcon } from '@/components/icons'
 import type { ApiUser } from '@/features/auth/api'
-import { getPaginatedProducts } from '@/features/products/api'
+import { getPaginatedProducts, getSearchSuggestions } from '@/features/products/api'
 import { formatPrice, mediaFrom, type StoreProduct } from '@/lib/store-shared'
 
 const RECENT_SEARCH_KEY = 'monokeys_recent_searches'
-const POPULAR_KEYWORDS = ['커스텀 키캡', '리니어', '알루미늄', '65%', 'PBT', '저소음'] as const
 
 type SubCategoryItem = {
   name: string
@@ -89,6 +88,7 @@ export function SiteHeader({
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [recentKeywords, setRecentKeywords] = useState<string[]>([])
+  const [suggestedKeywords, setSuggestedKeywords] = useState<string[]>([])
   const [previewItems, setPreviewItems] = useState<StoreProduct[]>([])
   const [previewTotal, setPreviewTotal] = useState(0)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -143,6 +143,23 @@ export function SiteHeader({
       // ignore
     }
   }
+
+  useEffect(() => {
+    if (!searchOpen) return
+    let ignore = false
+    getSearchSuggestions(6)
+      .then((list) => {
+        if (!ignore && Array.isArray(list)) {
+          setSuggestedKeywords(list)
+        }
+      })
+      .catch(() => {
+        if (!ignore) setSuggestedKeywords([])
+      })
+    return () => {
+      ignore = true
+    }
+  }, [searchOpen])
 
   useEffect(() => {
     if (!searchOpen) return
@@ -379,23 +396,25 @@ export function SiteHeader({
                   </div>
                 )}
 
-                <div>
-                  <p className="mb-3 text-xs font-semibold tracking-wider text-zinc-500">
-                    추천 키워드
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {POPULAR_KEYWORDS.map((term) => (
-                      <button
-                        className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-xs font-medium text-zinc-800 transition hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
-                        key={term}
-                        onClick={() => executeSearch(term)}
-                        type="button"
-                      >
-                        {term}
-                      </button>
-                    ))}
+                {suggestedKeywords.length > 0 && (
+                  <div>
+                    <p className="mb-3 text-xs font-semibold tracking-wider text-zinc-500">
+                      실시간 추천 키워드
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestedKeywords.map((term) => (
+                        <button
+                          className="rounded-full border border-zinc-300 bg-white px-4 py-1.5 text-xs font-medium text-zinc-800 transition hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
+                          key={term}
+                          onClick={() => executeSearch(term)}
+                          type="button"
+                        >
+                          {term}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="mt-7">

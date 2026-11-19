@@ -55,6 +55,8 @@ export interface ProductListResponse {
 export interface GetProductsParams {
   categoryId?: string | null
   subcategoryId?: string | null
+  keyword?: string | null
+  sort?: string | null
   page?: number
   size?: number
 }

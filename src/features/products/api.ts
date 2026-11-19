@@ -9,8 +9,8 @@ type ProductApiEnvelope<T> = {
 }
 
 // 백엔드 ApiResponse({ success, message, data }) 래핑과 비래핑 JSON을 모두 지원합니다.
-async function productRequest<T>(path: string): Promise<T> {
-  const result = await apiRequest<T | ProductApiEnvelope<T>>(path)
+async function productRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const result = await apiRequest<T | ProductApiEnvelope<T>>(path, init)
   if (result && typeof result === 'object' && !Array.isArray(result) && 'success' in result) {
     if (result.success !== true) {
       throw new Error(result.message || '상품 정보를 불러올 수 없습니다.')
@@ -28,6 +28,15 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 /**
+ * DB 재고·찜·주문 기반 실시간 추천 검색어 조회 (요청마다 캐시 없이 새 조합 수신)
+ */
+export async function getSearchSuggestions(limit = 6): Promise<string[]> {
+  return await productRequest<string[]>(`/api/products/search-suggestions?limit=${limit}`, {
+    cache: 'no-store',
+  })
+}
+
+/**
  * 페이징 및 소분류 필터링을 지원하는 상품 목록 조회
  */
 export async function getPaginatedProducts(
@@ -36,6 +45,8 @@ export async function getPaginatedProducts(
   const search = new URLSearchParams()
   if (params.categoryId && params.categoryId !== 'all') search.set('category', params.categoryId)
   if (params.subcategoryId) search.set('subcategory', params.subcategoryId)
+  if (params.keyword && params.keyword.trim()) search.set('keyword', params.keyword.trim())
+  if (params.sort && params.sort !== 'default') search.set('sort', params.sort)
   if (params.page !== undefined) search.set('page', String(params.page))
   if (params.size !== undefined) search.set('size', String(params.size))
 

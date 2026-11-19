@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   useContext,
   useEffect,
@@ -11,22 +11,35 @@ import {
 } from "react";
 import { CloseIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/common/site-header";
-import type { ApiUser } from "@/features/auth/api";
+import {
+  getCurrentUser,
+  logIn,
+  logOut,
+  type ApiUser,
+} from "@/features/auth/api";
 import { useCart } from "@/features/cart/cart-provider";
-import { ProductCartContext } from "@/features/cart/components/CartContext"; 
-import { ProductType } from "@/features/cart/interface/Product"; 
+import { WithdrawalSessionContext } from "@/features/user/withdrawal-session";
+import { ApiRequestError } from "@/lib/api-client";
+import { ProductCartContext } from "@/features/cart/components/CartContext";
+import { ProductType } from "@/features/cart/interface/Product";
 
 type AppUser = ApiUser;
 
+// 이메일 형식 검사 (아이디@도메인.주소)
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function StoreShell({ children }: { children: ReactNode }) {
-  const { products } = useContext(ProductCartContext);
-  const { openCart, closeCart } = useCart();
+  const { products, refreshCart, setProducts } = useContext(ProductCartContext);
+  const { openCart, closeCart, clearCart } = useCart();
 
   const pathname = usePathname();
+  const router = useRouter();
+  const [sessionVersion, setSessionVersion] = useState(0);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
-  const authPending = false;
+  // 요청 중에는 버튼·입력창을 잠가서 중복 클릭을 막는다
+  const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState("");
   const [agreements, setAgreements] = useState({
     marketing: false,
@@ -34,6 +47,21 @@ export function StoreShell({ children }: { children: ReactNode }) {
     service: false,
   });
   const [navVisible, setNavVisible] = useState(true);
+
+  // 화면이 처음 열릴 때(새로고침 포함) 쿠키로 로그인 상태를 복구한다
+  useEffect(() => {
+    let ignore = false;
+    getCurrentUser()
+      .then(({ user }) => {
+        if (!ignore) { setAuthUser(user); setSessionVersion(v => v + 1); }
+      })
+      .catch(() => {
+        if (!ignore) setAuthUser(null);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!pathname.startsWith("/products/")) return;
@@ -47,22 +75,86 @@ export function StoreShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [pathname]);
 
+  // 가입 완료 또는 로그인 안내에서 스토어로 이동하면 기존 계정 패널을 로그인 모드로 엽니다.
+  useEffect(() => {
+    if (pathname !== "/" || new URLSearchParams(window.location.search).get("login") !== "1") return;
+    const frame = window.requestAnimationFrame(() => {
+      closeCart();
+      setAuthError("");
+      setAuthMode("login");
+      setAuthOpen(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname, closeCart]);
+
   const openAccount = () => {
     closeCart();
     setAuthError("");
     setAuthOpen(true);
   };
 
-  const submitAuth = (event: FormEvent<HTMLFormElement>) => {
+  // 로그인: 입력 검증 → 로그인 API 호출 → 사용자 상태 반영
+  const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO(담당 1): 로그인 입력 검증 후 로그인 API를 호출하고 세션 상태를 반영합니다.
-    setAuthError("로그인 기능은 아직 연결되지 않았습니다.");
+    if (authMode !== "login") return; // 회원가입은 담당 2
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!email) {
+      setAuthError("이메일을 입력해 주세요.");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+      setAuthError("올바른 이메일 형식으로 입력해 주세요.");
+      return;
+    }
+    if (!password) {
+      setAuthError("비밀번호를 입력해 주세요.");
+      return;
+    }
+
+    setAuthError("");
+    setAuthPending(true);
+    try {
+      const { user } = await logIn(email, password);
+      setAuthUser(user);
+      // 로그인한 회원의 장바구니를 서버에서 다시 불러와 헤더 개수에 반영
+      refreshCart();
+      setSessionVersion(v => v + 1);
+      setAuthOpen(false);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 401) {
+        setAuthError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      } else {
+        setAuthError("잠시 후 다시 시도해 주세요.");
+      }
+      // 실패하면 비밀번호 입력칸만 비운다
+      const passwordInput = form.elements.namedItem("password");
+      if (passwordInput instanceof HTMLInputElement) passwordInput.value = "";
+    } finally {
+      setAuthPending(false);
+    }
   };
 
-  const logout = () => {
-    // TODO(담당 1): 로그아웃 API 호출 후 세션과 사용자 상태를 초기화합니다.
-    setAuthUser(null);
-    setAuthOpen(false);
+  // 로그아웃: 로그아웃 API 호출 → 사용자 상태 초기화 → 메인으로 이동
+  const logout = async () => {
+    setAuthError("");
+    setAuthPending(true);
+    try {
+      await logOut();
+      setAuthUser(null);
+      // 로그아웃하면 화면에 남아 있던 장바구니(헤더 개수 포함)를 비움
+      setProducts([]);
+      setAuthOpen(false);
+      router.replace("/");
+    } catch {
+      setAuthError("로그아웃에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setAuthPending(false);
+    }
   };
 
   const cartCount = products.reduce(
@@ -82,7 +174,22 @@ export function StoreShell({ children }: { children: ReactNode }) {
         user={authUser}
         visible={navVisible}
       />
-      <main className="min-h-screen pt-[123px] md:pt-[150px]">{children}</main>
+      <main className="min-h-screen pt-[123px] md:pt-[150px]">
+        <WithdrawalSessionContext.Provider value={authUser ? {
+          user: authUser,
+          sessionVersion,
+          clearAfterWithdrawal: () => {
+            setAuthUser(null);
+            setSessionVersion(v => v + 1);
+            setAuthOpen(false);
+            setAuthError("");
+            closeCart();
+            clearCart();
+          },
+        } : null}>
+          {children}
+        </WithdrawalSessionContext.Provider>
+      </main>
       <div
         className={`fixed inset-0 z-[60] transition ${authOpen ? "pointer-events-auto" : "pointer-events-none"}`}
         aria-hidden={!authOpen}
@@ -131,6 +238,15 @@ export function StoreShell({ children }: { children: ReactNode }) {
                     {authUser.role}
                   </strong>
                 </div>
+                {authUser.role === "user" && (
+                  <Link
+                    className="mt-5 inline-flex h-12 items-center justify-center rounded-md border border-zinc-300 text-sm font-semibold transition hover:border-zinc-950 hover:bg-zinc-50"
+                    href="/mypage"
+                    onClick={() => setAuthOpen(false)}
+                  >
+                    마이페이지
+                  </Link>
+                )}
                 {authUser.role === "admin" && (
                   <Link
                     className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-800"
@@ -162,6 +278,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
             <form
               className="flex min-h-0 flex-1 flex-col"
               onSubmit={submitAuth}
+              noValidate
             >
               <div className="flex-1 overflow-y-auto py-7 pr-1">
                 {authMode === "login" ? (
@@ -197,9 +314,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
                       disabled={authPending}
                       id="password"
                       maxLength={128}
-                      minLength={8}
                       name="password"
-                      placeholder="8자 이상 입력해 주세요"
+                      placeholder="비밀번호를 입력하세요"
                       required
                       type="password"
                     />

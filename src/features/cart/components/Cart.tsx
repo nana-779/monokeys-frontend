@@ -1,8 +1,9 @@
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 import "../style.css";
 import { ProductCartContext } from "./CartContext";
 import type { ProductList, ProductType } from "../interface/Product";
 import { useRouter } from "next/navigation";
+import { formatPrice } from "@/lib/store-shared";
 
 type CartProps = {
   open: boolean;
@@ -10,7 +11,14 @@ type CartProps = {
 };
 
 export function Cart({ open, onClose } : CartProps) {
-    const {products, handleClearCart} = useContext(ProductCartContext);
+    const { products, refreshCart } = useContext(ProductCartContext);
+
+    // 장바구니 서랍이 열릴 때(false -> true) 딱 1번만 백엔드 최신 상태 동기화 (무한 루프 방지)
+    useEffect(() => {
+        if (open && typeof refreshCart === "function") {
+            refreshCart();
+        }
+    }, [open]);
 
     const router = useRouter();
 
@@ -68,15 +76,15 @@ export function Cart({ open, onClose } : CartProps) {
                     <div id="Cart-Footer">
                         <div id="Total-Const-Fraim">
                             <p id="Subtotal">Subtotal</p>
-                            <p id="Total-Cost">${totalCost.toLocaleString("ko-KR")}</p>
+                            <p id="Total-Cost">{formatPrice(totalCost)}</p>
                         </div>
                         <button id="Cart-Payment-Button"
                                 className={`transition-all duration-150 ${allItemCount > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
                                 type="button"
                                 disabled={allItemCount === 0}
                                 onClick={() => {
-                                    router.push("/checkout");
                                     onClose();
+                                    router.push('/checkout');
                                 }}
                         >CHECKOUT</button>
                     </div>
@@ -113,7 +121,13 @@ function ListItem({ product } : ProductList) {
 
     return (
         <ul id="In-Item">
-            <img id="Cart-Item-Img" src={product.thumbnailUrl} />
+            {product.thumbnailUrl ? (
+                <img id="Cart-Item-Img" src={product.thumbnailUrl} alt={product.name || "상품 이미지"} />
+            ) : (
+                <div id="Cart-Item-Img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f4f4f5', fontSize: '11px', color: '#a1a1aa' }}>
+                    NO IMG
+                </div>
+            )}
             <div id="Cart-Item-Distance">
                 <div id="Cart-Item-Main">
                     <p id="Cart-Item-Name">{product.name}</p>
@@ -151,7 +165,7 @@ function ListItem({ product } : ProductList) {
                             </svg>
                         </button>
                     </div>
-                    <p id="Cart-Explain">${(product.price * product.quantity).toLocaleString("ko-KR")}</p>
+                    <p id="Cart-Explain">{formatPrice(product.price * product.quantity)}</p>
                 </div>
             </div>
         </ ul>

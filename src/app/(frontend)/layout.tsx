@@ -11,11 +11,11 @@ import { ProductCartProvider } from '@/features/cart/components/Provider'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
-const defaultTitle = 'MONO / KEYS — Mechanical keyboards and desk tools'
+const defaultTitle = 'MONO / KEYS — 기판 · 스위치 · 키캡'
 const title = makeSiteSettings.title ?? defaultTitle
 const description =
   makeSiteSettings.description ??
-  'Considered mechanical keyboards, switches, keycaps, and accessories for focused work.'
+  '기판, 스위치, 키캡과 액세서리로 완성하는 나만의 키보드.'
 const favicon = makeSiteSettings.icons?.icon
 const socialImage = makeSiteSettings.openGraph?.image
 const googleAnalyticsId = sanitizeHtmlAttribute(makeSiteSettings.analytics?.googleAnalyticsId)
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const customScripts = makeSiteSettings.customScripts
 
   return (
-    <html lang={language} data-scroll-behavior="smooth">
+    <html data-scroll-behavior="smooth" lang={language}>
       <head>
         {renderHeadCustomCode(customScripts?.headStart, 'head-start')}
         {renderHeadCustomCode(customScripts?.headEnd, 'head-end')}

@@ -282,6 +282,8 @@ export function SiteHeader({
     }
   }
 
+  const button_interaction = "cursor-pointer origin-center transition-transform duration-300 hover:scale-[1.08]"
+
   return (
     <>
       <header
@@ -290,7 +292,7 @@ export function SiteHeader({
       >
         <div className="relative mx-auto h-[123px] w-[min(80%,1184px)] max-lg:w-[92%] md:h-[150px]">
           <Link
-            className="absolute left-0 top-4 text-sm font-semibold tracking-[-0.04em] sm:text-base"
+            className={`absolute left-0 top-4 text-sm font-semibold tracking-[-0.04em] sm:text-base ${button_interaction}`}
             href="/"
           >
             <span className="sm:hidden">M/K</span>
@@ -301,13 +303,13 @@ export function SiteHeader({
             aria-label="Utility navigation"
             className="absolute right-0 top-[18px] flex items-center gap-3 text-[10px] font-medium tracking-[-0.01em] text-[#34264b] sm:gap-5 sm:text-[12px] lg:gap-7 lg:text-[15px]"
           >
-            <button className="whitespace-nowrap" onClick={() => setSearchOpen(true)} type="button">
+            <button className={`whitespace-nowrap ${button_interaction}`} onClick={() => setSearchOpen(true)} type="button">
               SEARCH
             </button>
-            <button className="whitespace-nowrap" onClick={onOpenCart} type="button">
+            <button className={`whitespace-nowrap ${button_interaction}`} onClick={onOpenCart} type="button">
               CART <span aria-label={`${cartCount} items`}>({cartCount})</span>
             </button>
-            <button className="whitespace-nowrap" onClick={onOpenAccount} type="button">
+            <button className={`whitespace-nowrap ${button_interaction}`} onClick={onOpenAccount} type="button">
               {user ? (user.role === 'admin' ? 'ADMIN' : 'MYPAGE') : 'LOGIN'}
             </button>
           </nav>

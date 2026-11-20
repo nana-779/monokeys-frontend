@@ -374,7 +374,7 @@ export default function SignupPage() {
       <form className="space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-9" onSubmit={submitSignup}>
         {/* 이메일 입력 및 중복 확인 */}
         <label className="block text-sm font-medium text-zinc-800">
-          이메일
+          이메일 *
           <input
             aria-describedby="signup-email-feedback"
             autoComplete="email"
@@ -400,7 +400,7 @@ export default function SignupPage() {
 
         {/* 비밀번호 입력 */}
         <label className="block text-sm font-medium text-zinc-800">
-          비밀번호
+          비밀번호 *
           <input
             aria-describedby="signup-password-feedback"
             autoComplete="new-password"
@@ -425,7 +425,7 @@ export default function SignupPage() {
         {/* 비밀번호 확인 */}
         <div>
           <label className="block text-sm font-medium text-zinc-800" htmlFor="signup-password-confirm">
-            비밀번호 확인
+            비밀번호 확인 *
           </label>
           <input
             aria-describedby="signup-password-confirm-feedback"
@@ -459,7 +459,7 @@ export default function SignupPage() {
 
         {/* 이름 입력 */}
         <label className="block text-sm font-medium text-zinc-800">
-          이름
+          이름 *
           <input
             autoComplete="name"
             className={inputClass}
@@ -476,7 +476,7 @@ export default function SignupPage() {
 
         {/* 전화번호 입력 (숫자 입력 시 자동 하이픈 포맷 적용) */}
         <label className="block text-sm font-medium text-zinc-800">
-          전화번호
+          전화번호 *
           <input
             autoComplete="tel-national"
             className={inputClass}
@@ -500,7 +500,7 @@ export default function SignupPage() {
 
         {/* 기본 배송지 (우편번호 검색 연동) */}
         <fieldset className="space-y-3 border-t border-zinc-200 pt-5" disabled={disabled}>
-          <legend className="text-sm font-medium text-zinc-800">기본배송지</legend>
+          <legend className="text-sm font-medium text-zinc-800">기본배송지 *</legend>
           <div className="flex items-center gap-2">
             <input
               aria-label="우편번호"

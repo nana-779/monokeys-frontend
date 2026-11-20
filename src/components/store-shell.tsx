@@ -165,7 +165,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
   return (
     <>
       <SiteHeader
-        cartCount={cartCount}
+        cartCount={products.length}
         onOpenAccount={openAccount}
         onOpenCart={() => {
           setAuthOpen(false);

@@ -24,8 +24,20 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
     refreshCart();
   }, [refreshCart]);
 
-  // 2. 장바구니 상품 추가 (백엔드 쿠키 인증 결과에 따라 처리)
+  // 2. 장바구니 상품 추가 (단일 상품 / 커스텀 빌드 공통)
   async function handleAddProduct(newProduct: ProductType): Promise<boolean> {
+    const isCustom = Boolean(
+      (newProduct.manualBuildId && newProduct.manualBuildId > 0) ||
+      (newProduct.autoBuildId && newProduct.autoBuildId > 0) ||
+      (newProduct.customBuildId && newProduct.customBuildId > 0) ||
+      newProduct.buildType === 'MANUAL' ||
+      newProduct.buildType === 'AUTO' ||
+      newProduct.partType === 'CUSTOM'
+    );
+
+    // 커스텀 빌드인 경우 product_id를 전혀 포함하지 않고 manual_build_id 또는 auto_build_id 외래키만 전송
+    let targetPayload: { productId?: number; manualBuildId?: number; autoBuildId?: number };
+
     const existingProduct = products.find(
       (product) => product.productId === newProduct.productId
     );

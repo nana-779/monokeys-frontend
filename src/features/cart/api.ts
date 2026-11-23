@@ -38,6 +38,7 @@ export async function getCartApi(): Promise<ProductType[]> {
         customBuildId: item.customBuildId ?? 0,
         buildName: item.buildName ?? '',
         includeAssembly: item.includeAssembly ?? false,
+        partProductIds: item.partProductIds ?? []
       }))
     }
     return []

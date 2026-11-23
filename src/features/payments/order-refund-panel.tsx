@@ -1,10 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiRequestError } from '@/lib/api-client'
 import { formatPrice } from '@/lib/store-shared'
-import { readOrderRefundHistory, readOrderRefundPreview, type OrderRefundHistory, type OrderRefundPreview } from './order-refund-api'
+import {
+  readOrderRefundHistory,
+  readOrderRefundPreview,
+  reconcileCancellation,
+  requestFullCancellation,
+  type OrderRefundHistory,
+  type OrderRefundPreview,
+} from './order-refund-api'
 import { OrderRefundHistoryPanel } from './order-refund-history-panel'
 
 const REASON_MAX_LENGTH = 140
@@ -25,13 +32,21 @@ type HistoryState =
   | { status: 'error'; message: string }
   | { status: 'ready'; history: OrderRefundHistory }
 
-// 결제 조회 결과와 화면 안의 취소 대상 확인만 관리합니다. 입력한 사유는 서버에 보내지 않습니다.
+type CancellationState =
+  | { status: 'idle' }
+  | { status: 'sending'; action: 'cancel' | 'reconcile' }
+  | { status: 'pending'; refundId?: number; lastKnownId: number; message: string }
+  | { status: 'confirmed'; amount: number; full: boolean }
+  | { status: 'error'; message: string }
+
 export function OrderRefundPanel({ orderNumber }: { orderNumber: string }) {
   const [state, setState] = useState<PreviewState>({ status: 'loading' })
   const [historyState, setHistoryState] = useState<HistoryState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [reason, setReason] = useState('')
   const [confirmed, setConfirmed] = useState(false)
+  const [cancellation, setCancellation] = useState<CancellationState>({ status: 'idle' })
+  const requestInFlight = useRef(false)
 
   useEffect(() => {
     // 화면을 떠나거나 다시 조회하면 이전 요청을 중단해 늦게 도착한 결과를 반영하지 않습니다.
@@ -70,8 +85,7 @@ export function OrderRefundPanel({ orderNumber }: { orderNumber: string }) {
     return () => controller.abort()
   }, [orderNumber, attempt])
 
-  function refresh() {
-    if (state.status === 'loading' || historyState.status === 'loading') return
+  function reloadRefundDetails() {
     setConfirmed(false)
     setState({ status: 'loading' })
     setHistoryState({ status: 'loading' })
@@ -81,8 +95,60 @@ export function OrderRefundPanel({ orderNumber }: { orderNumber: string }) {
   const preview = state.status === 'ready' ? state.preview : null
   const history = historyState.status === 'ready' ? historyState.history : null
   const fullyCanceled = history?.status === 'FULL' || preview?.paymentStatus === 'CANCELLED'
-  // ZIP 화면의 사유 입력 기준을 미리보기에 사용합니다. 실제 요청 단계에서는 서버가 다시 검증해야 합니다.
+    || (cancellation.status === 'confirmed' && cancellation.full)
+  const pendingEntry = history?.entries.some((entry) => entry.status === 'REQUESTED') ?? false
+  const pendingWasRejected = cancellation.status === 'pending' && history?.entries.some((entry) =>
+    entry.status === 'REJECTED' && (cancellation.refundId === undefined
+      ? entry.id > cancellation.lastKnownId
+      : entry.id === cancellation.refundId),
+  )
+  const pending = !fullyCanceled && (pendingEntry || (cancellation.status === 'pending' && !pendingWasRejected))
+  const sending = cancellation.status === 'sending'
+  const loading = state.status === 'loading' || historyState.status === 'loading'
   const reasonInvalid = /[\u0000-\u001f\u007f-\u009f]/u.test(reason)
+  const remainingAmount = preview?.localRemainingAmount ?? null
+  // 새 조회에서 결제 상태와 내역이 모두 일치할 때만 최초 결제 금액 전체를 취소할 수 있습니다.
+  const canConfirm = preview?.cancellationEnabled === true && preview.status === 'PRECHECK_PASSED'
+    && preview.paymentStatus === 'PAID' && !fullyCanceled && !pending && !sending
+    && history?.status === 'NONE' && remainingAmount !== null && remainingAmount > 0
+    && remainingAmount === preview.paymentAmount && remainingAmount === history.remainingAmount
+  const canReconcile = preview?.cancellationEnabled === true && pendingEntry && !fullyCanceled && !sending
+
+  async function submitCancellation(action: 'cancel' | 'reconcile') {
+    if (requestInFlight.current) return
+    if (action === 'cancel' && (!canConfirm || !confirmed || !reason.trim() || reasonInvalid)) return
+    if (action === 'reconcile' && !canReconcile) return
+
+    // 버튼이 다시 그려지기 전 연달아 눌러도 요청을 한 번만 보냅니다.
+    requestInFlight.current = true
+    const lastKnownId = history?.entries.reduce((highest, entry) => Math.max(highest, entry.id), 0) ?? 0
+    setCancellation({ status: 'sending', action })
+    try {
+      let result
+      if (action === 'cancel') {
+        if (remainingAmount === null) return
+        result = await requestFullCancellation(orderNumber, reason.trim(), remainingAmount)
+      } else {
+        result = await reconcileCancellation(orderNumber)
+      }
+      setCancellation(result.status === 'CANCELLATION_CONFIRMED'
+        ? { status: 'confirmed', amount: result.amount, full: result.amount === preview?.paymentAmount }
+        : { status: 'pending', refundId: result.refundId, lastKnownId, message: '취소 결과를 확인 중입니다.' })
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status < 500) {
+        setCancellation({ status: 'error', message: error.message })
+      } else {
+        // 응답이 끊겼거나 서버 결과가 불분명하면 취소를 재전송하지 않고 내역부터 확인합니다.
+        const message = error instanceof ApiRequestError
+          ? error.message
+          : '취소 응답을 받지 못했습니다. 환불 내역을 다시 확인해 주세요.'
+        setCancellation({ status: 'pending', lastKnownId, message })
+      }
+    } finally {
+      reloadRefundDetails()
+      requestInFlight.current = false
+    }
+  }
 
   return (
     <div className="mt-6 space-y-5 rounded-2xl border border-neutral-200 bg-white p-5 sm:p-7">
@@ -116,13 +182,17 @@ export function OrderRefundPanel({ orderNumber }: { orderNumber: string }) {
             <p className="font-semibold">{previewLabels[preview.status]}</p>
             <p className="mt-1 text-neutral-700">{preview.message}</p>
           </div>
-          {preview.status === 'PRECHECK_PASSED' && !fullyCanceled && (
+          {!preview.cancellationEnabled && preview.status === 'PRECHECK_PASSED' && !fullyCanceled && (
+            <p className="text-sm text-neutral-600">전액 취소는 활성화된 테스트 환경에서만 요청할 수 있어요.</p>
+          )}
+          {preview.status === 'PRECHECK_PASSED' && preview.cancellationEnabled && !fullyCanceled && !pending && (
             <div className="space-y-3">
               <label htmlFor="refund-reason" className="block text-sm font-semibold">취소 사유</label>
               <input
                 id="refund-reason"
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 maxLength={REASON_MAX_LENGTH}
+                disabled={!canConfirm}
                 placeholder="취소 사유를 입력해 주세요"
                 value={reason}
                 aria-invalid={reasonInvalid}
@@ -135,30 +205,64 @@ export function OrderRefundPanel({ orderNumber }: { orderNumber: string }) {
               <button
                 type="button"
                 className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                disabled={!reason.trim() || reasonInvalid || confirmed}
+                disabled={!canConfirm || !reason.trim() || reasonInvalid || confirmed}
                 onClick={() => setConfirmed(true)}
               >
                 취소 대상 확인
               </button>
-              {confirmed && preview.paymentAmount !== null && (
+              {confirmed && remainingAmount !== null && (
                 <p role="status" className="text-sm">
-                  {preview.orderNumber} 주문의 {formatPrice(preview.paymentAmount)} 전액 취소 대상을 확인했어요.
+                  {preview.orderNumber} 주문의 {formatPrice(remainingAmount)} 전액을 취소합니다.
                 </p>
               )}
             </div>
           )}
-          {/* 실제 취소가 준비되기 전까지 이 버튼은 요청을 전송하지 않습니다. */}
-          <button type="button" disabled className="rounded-lg border px-4 py-2 text-sm text-neutral-500">
-            {fullyCanceled ? '전액 취소된 결제' : '결제 취소 (준비 중)'}
+          <button type="button" disabled={!canConfirm || !confirmed || !reason.trim() || reasonInvalid}
+            onClick={() => void submitCancellation('cancel')}
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {fullyCanceled ? '전액 취소된 결제' : '전액 취소 요청'}
           </button>
         </>
       )}
 
+      {cancellation.status === 'sending' && (
+        <p role="status" className="text-sm">
+          {cancellation.action === 'cancel' ? '전액 취소를 요청하고 있어요.' : '취소 결과를 다시 확인하고 있어요.'}
+        </p>
+      )}
+      {cancellation.status === 'confirmed' && (
+        <div className="space-y-2 text-sm">
+          <p role="status">
+            {formatPrice(cancellation.amount)} {cancellation.full ? '전액 취소' : '취소'}가 확인됐습니다.
+            카드·계좌에 반영되기까지 시간이 걸릴 수 있어요.
+          </p>
+          <Link href="/mypage" className="inline-block underline underline-offset-4">
+            마이페이지 주문 내역으로
+          </Link>
+        </div>
+      )}
+      {pending && (
+        <p role="status" className="text-sm text-amber-800">
+          {cancellation.status === 'pending' ? cancellation.message : '처리 중인 취소 요청이 있습니다.'}
+        </p>
+      )}
+      {pendingEntry && !fullyCanceled && (
+        <button type="button" disabled={!canReconcile} onClick={() => void submitCancellation('reconcile')}
+          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          취소 결과 다시 확인
+        </button>
+      )}
+      {!fullyCanceled && cancellation.status === 'error' && (
+        <p role="alert" className="text-sm text-red-700">{cancellation.message}</p>
+      )}
+      {!fullyCanceled && pendingWasRejected && (
+        <p role="alert" className="text-sm text-red-700">환불 내역에서 취소 실패를 확인했습니다.</p>
+      )}
       {history && <OrderRefundHistoryPanel history={history} />}
       {historyState.status === 'loading' && <p role="status">환불 내역을 확인하고 있어요.</p>}
       {historyState.status === 'error' && <p role="alert" className="text-sm text-red-700">{historyState.message}</p>}
       <button type="button" className="text-sm underline disabled:opacity-50"
-        disabled={state.status === 'loading' || historyState.status === 'loading'} onClick={refresh}>
+        disabled={loading || sending} onClick={reloadRefundDetails}>
         다시 조회
       </button>
     </div>

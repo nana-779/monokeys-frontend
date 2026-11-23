@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { MyOrderList } from '@/features/orders/my-order-list'
 import { useWithdrawalSession } from '@/features/user/withdrawal-session'
 
 export default function MyPage() {
@@ -12,9 +13,13 @@ export default function MyPage() {
       <h1 className="mb-8 text-center text-4xl font-medium tracking-[-0.06em] sm:text-5xl">마이페이지</h1>
       <div className="space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-9">
         {session ? (
-          <Link className="text-sm font-semibold underline underline-offset-4" href="/user/delete-account">
-            회원탈퇴
-          </Link>
+          <>
+            {/* 계정이나 로그인 세션이 바뀌면 이전 회원의 주문 목록을 즉시 비웁니다. */}
+            <MyOrderList key={JSON.stringify([session.user.id, session.sessionVersion])} />
+            <Link className="text-sm font-semibold underline underline-offset-4" href="/user/delete-account">
+              회원탈퇴
+            </Link>
+          </>
         ) : (
           <p className="text-sm text-zinc-600">
             마이페이지를 이용하려면 로그인해 주세요.{' '}

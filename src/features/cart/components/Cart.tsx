@@ -161,8 +161,8 @@ export function Cart({ open, onClose } : CartProps) {
                                         describe="원하는 상품을 장바구니에 담아보세요."
                                     />
                                 ) : (
-                                    standardProducts.map((product: ProductType) => (
-                                        <ListItem key={product.productId} product={product} />
+                                    standardProducts.map((product: ProductType, idx: number) => (
+                                        <ListItem key={product.cartItemId ?? `standard-${product.productId}-${idx}`} product={product} />
                                     ))
                                 )}
                             </div>
@@ -175,8 +175,8 @@ export function Cart({ open, onClose } : CartProps) {
                                         describe="CUSTOM BUILD에서 나만의 키보드를 조립해보세요."
                                     />
                                 ) : (
-                                    customProducts.map((product: ProductType) => (
-                                        <ListItem key={product.productId} product={product} />
+                                    customProducts.map((product: ProductType, idx: number) => (
+                                        <ListItem key={product.cartItemId ?? `custom-${product.manualBuildId ?? product.autoBuildId ?? idx}`} product={product} />
                                     ))
                                 )}
                             </div>
@@ -265,13 +265,13 @@ function ListItem({ product } : ProductList) {
                             <p id="Cart-Item-Count">{product.quantity}</p>
                         </div>
                         <button id="Cart-Count-Plus"
-                                className="on"
+                                className={`${product.quantity < product.stockQuantity ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
                                 onClick={() => {
                             handleUpdateCount(product.cartItemId ?? product.manualBuildId ?? product.productId, product.quantity + 1);
                         }}>
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M0 4.66667H4.66667M4.66667H9.33333M4.66667V0M4.66667V9.33333" stroke="currentColor"/>
+                                <path d="M0 4.66667H4.66667M4.66667 4.66667H9.33333M4.66667 4.66667V0M4.66667 4.66667V9.33333" stroke="currentColor"/>
                             </svg>
                         </button>
                     </div>

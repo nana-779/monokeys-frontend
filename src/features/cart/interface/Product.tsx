@@ -1,5 +1,5 @@
 export interface ProductType {
-    cartItemId : number,        // cart_item 테이블 PK
+    cartItemId? : number,        // cart_item 테이블 PK
     productId : number,         // Id
     name : string,              // 이름
     price : number,             // 기본 단가

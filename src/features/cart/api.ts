@@ -23,6 +23,10 @@ export async function getCartApi(): Promise<ProductType[]> {
     const list = res?.data || res || []
     if (Array.isArray(list)) {
       return list.map((item: any) => ({
+        cartItemId: item.cartItemId,
+        manualBuildId: item.manualBuildId,
+        autoBuildId: item.autoBuildId,
+        buildType: item.buildType,     
         productId: item.productId ?? item.product?.productId ?? item.id,
         name: item.name ?? item.product?.name ?? '',
         price: item.price ?? item.product?.basePrice ?? 0,
@@ -48,11 +52,17 @@ export async function getCartApi(): Promise<ProductType[]> {
 }
 
 // 2. 장바구니에 상품 담기 (POST /api/cart)
-export async function addCartItemApi(productId: number, quantity: number): Promise<boolean> {
+export async function addCartItemApi(
+  target: number | { productId?: number; manualBuildId?: number; autoBuildId?: number },
+  quantity: number
+): Promise<boolean> {
   try {
+    const body = typeof target === 'number'
+      ? { productId: target, quantity }
+      : { ...target, quantity }
     await apiRequest('/api/cart', {
       method: 'POST',
-      body: JSON.stringify({ productId, quantity }),
+      body: JSON.stringify(body),
     })
     return true
   } catch (error) {
@@ -60,14 +70,11 @@ export async function addCartItemApi(productId: number, quantity: number): Promi
       alert('로그인이 필요한 서비스입니다.')
       return false
     }
-    // 재고 초과(400) 등 서버가 거부한 경우: 서버가 보낸 메시지를 그대로 보여 줌
     if (error instanceof ApiRequestError) {
       alert(error.message)
       return false
     }
-    // 서버가 꺼져 있는 등 응답 자체를 못 받은 경우
-    alert('장바구니에 담지 못했습니다. 잠시 후 다시 시도해 주세요.')
-    console.error('장바구니 담기 실패:', error)
+    alert('장바구니에 담지 못했습니다.')
     return false
   }
 }

@@ -6,6 +6,11 @@ export type ApiUser = {
   id: string | number
   email: string
   role: 'admin' | 'user'
+  name?: string | null
+  phone?: string | null
+  postalCode?: string | null
+  roadAddress?: string | null
+  detailAddress?: string | null
 }
 
 // 백엔드 응답 형식(팀 ApiResponse): { success, message, data: { user: { id, email, role } } }
@@ -14,6 +19,11 @@ type ServerUser = {
   id: number
   email: string
   role: string
+  name?: string | null
+  phoneNumber?: string | null
+  postalCode?: string | null
+  roadAddress?: string | null
+  detailAddress?: string | null
 }
 
 type ServerUserResponse = { success: boolean; message: string | null; data: { user: ServerUser } }
@@ -24,6 +34,11 @@ function toApiUser(user: ServerUser): ApiUser {
     id: user.id,
     email: user.email,
     role: user.role.toUpperCase() === 'ADMIN' ? 'admin' : 'user',
+    name: user.name || null,
+    phone: user.phoneNumber || null,
+    postalCode: user.postalCode || null,
+    roadAddress: user.roadAddress || null,
+    detailAddress: user.detailAddress || null,
   }
 }
 

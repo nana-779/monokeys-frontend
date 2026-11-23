@@ -7,6 +7,9 @@ import { checkSignupEmail, signUpCustomer } from '@/features/user/api'
 import { loadPostcode, postcodeError } from '@/features/user/postcode'
 import { ApiRequestError } from '@/lib/api-client'
 
+// =============================================================================
+// 스타일 및 고정 상수 정의
+// =============================================================================
 const inputBaseClass =
   'h-12 w-full rounded-md border border-zinc-300 bg-white px-4 text-sm outline-none transition placeholder:text-zinc-400 focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950/5'
 const inputClass = 'mt-2 ' + inputBaseClass
@@ -14,9 +17,11 @@ const outlineButton =
   'h-12 shrink-0 rounded-md border border-zinc-300 px-4 text-sm font-medium transition hover:border-zinc-950 hover:bg-zinc-50 disabled:opacity-60'
 const dialogClass =
   'm-auto w-[min(92%,480px)] rounded-xl border border-zinc-200 bg-white p-6 shadow-xl backdrop:bg-black/50'
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phonePattern = /^010[0-9]{8}$/
 
+// 회원가입 필수 약관 목록
 const terms = [
   {
     name: 'serviceTerms',
@@ -30,35 +35,85 @@ const terms = [
   },
 ] as const
 
+// 주소 관련 서버 검증 에러 키 목록
+const ADDRESS_ERROR_FIELDS = [
+  'defaultAddress',
+  'defaultAddress.zonecode',
+  'defaultAddress.roadAddress',
+  'defaultAddress.detailAddress',
+] as const
+
 type EmailCheck = { email: string; available: boolean; message: string }
 type FormError = { message: string; fields?: Record<string, string> }
 
-// 서버와 같은 정책으로 제출 전에 안내합니다. 브라우저 검사는 우회할 수 있으므로 최종 검증은 서버가 다시 수행합니다.
-function validPassword(password: string) {
+// =============================================================================
+// 유효성 검사 및 포맷터 헬퍼 함수
+// =============================================================================
+
+/**
+ * 비밀번호 정책 검증 (서버 정책과 동일)
+ * - 8자 이상 20자 이하
+ * - 영문 대/소문자 및 숫자 반드시 포함
+ * - UTF-8 인코딩 기준 최대 72바이트 이하 (bcrypt 한계 보호)
+ */
+function validPassword(password: string): boolean {
   const length = Array.from(password).length
-  return length >= 8 && length <= 20 && /[a-z]/i.test(password) && /[0-9]/.test(password)
-    && new TextEncoder().encode(password).length <= 72
+  return (
+    length >= 8 &&
+    length <= 20 &&
+    /[a-z]/i.test(password) &&
+    /[0-9]/.test(password) &&
+    new TextEncoder().encode(password).length <= 72
+  )
 }
 
-/** 가입 입력과 사전 확인, 주소 선택, 제출 결과를 관리합니다. HTTP 요청 형식과 오류 해석은 회원 API에 맡깁니다. */
+/**
+ * 전화번호 문자열을 '010-XXXX-XXXX' 형식으로 포맷팅
+ */
+function formatPhoneNumber(digitsOnly: string): string {
+  const p1 = digitsOnly.slice(0, 3)
+  const p2 = digitsOnly.slice(3, 7)
+  const p3 = digitsOnly.slice(7, 11)
+  return [p1, p2, p3].filter(Boolean).join('-')
+}
+
+// =============================================================================
+// 회원가입 페이지 메인 컴포넌트
+// =============================================================================
 export default function SignupPage() {
   const router = useRouter()
+
+  // ---------------------------------------------------------------------------
+  // 1. 입력 필드 상태 관리
+  // ---------------------------------------------------------------------------
   const [email, setEmail] = useState('')
   const [emailCheck, setEmailCheck] = useState<EmailCheck | null>(null)
+
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [passwordConfirmTouched, setPasswordConfirmTouched] = useState(false)
+
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [phoneTouched, setPhoneTouched] = useState(false)
+
   const [postalCode, setPostalCode] = useState('')
   const [address, setAddress] = useState('')
   const [detail, setDetail] = useState('')
+
   const [termsConsent, setTermsConsent] = useState({ serviceTerms: false, privacyPolicy: false })
+
+  // ---------------------------------------------------------------------------
+  // 2. 제출 및 UI 상태 관리
+  // ---------------------------------------------------------------------------
   const [postcodeMessage, setPostcodeMessage] = useState('')
   const [error, setError] = useState<FormError | null>(null)
   const [pending, setPending] = useState(false)
   const [completed, setCompleted] = useState(false)
+
+  // ---------------------------------------------------------------------------
+  // 3. 비동기 요청 제어 및 DOM 참조 (Ref)
+  // ---------------------------------------------------------------------------
   const submitLock = useRef(false)
   const emailRequest = useRef<AbortController | null>(null)
   const postcodeDialog = useRef<HTMLDialogElement>(null)
@@ -66,58 +121,74 @@ export default function SignupPage() {
   const postcodeSession = useRef<symbol | null>(null)
   const detailAddress = useRef<HTMLInputElement>(null)
   const successDialog = useRef<HTMLDialogElement>(null)
+
+  // ---------------------------------------------------------------------------
+  // 4. 유효성 검사 및 제출 가능 여부 연산
+  // ---------------------------------------------------------------------------
   const normalizedEmail = email.trim()
   const currentEmailCheck = emailCheck?.email === normalizedEmail ? emailCheck : null
   const available = currentEmailCheck?.available === true
   const emailValid = emailPattern.test(normalizedEmail) && normalizedEmail.length <= 50
   const disabled = pending || completed
-  // 재입력 칸에서 벗어나거나 가입을 시도하면 불일치를 표시합니다.
-  // 그 뒤에는 두 칸의 현재 값을 비교해 어느 쪽을 수정해도 안내를 갱신합니다.
+
   const passwordsMatch = password === passwordConfirm
   const showPasswordMismatch = passwordConfirmTouched && !passwordsMatch
   const passwordValid = validPassword(password)
   const phoneValid = phonePattern.test(phone)
-  const hasRequiredFields = !!(name.trim() && postalCode.trim() && address.trim() && detail.trim())
-  const canSubmit = available && passwordValid && phoneValid
-    && hasRequiredFields && termsConsent.serviceTerms && termsConsent.privacyPolicy
 
-  // 형식이 맞는 이메일의 입력이 500ms 동안 멈추면 중복을 확인합니다.
-  // 이메일을 바꾸면 이전 결과를 지우고 요청을 취소해 현재 주소의 결과만 사용합니다.
+  const hasRequiredFields = Boolean(name.trim() && postalCode.trim() && address.trim() && detail.trim())
+  const canSubmit =
+    available &&
+    passwordValid &&
+    phoneValid &&
+    hasRequiredFields &&
+    termsConsent.serviceTerms &&
+    termsConsent.privacyPolicy
+
+  // ---------------------------------------------------------------------------
+  // 5. 이메일 중복 확인 (500ms 디바운스 적용)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const addressToCheck = email.trim()
     if (!emailPattern.test(addressToCheck) || addressToCheck.length > 50) return
 
-    // 이전 이메일의 응답이 나중에 도착해도 현재 입력의 중복 확인 결과를 덮어쓰지 않도록 요청마다 취소 신호를 둡니다.
+    // 이전 이메일 응답이 현재 입력을 덮어쓰지 않도록 요청 취소 컨트롤러 사용
     const request = new AbortController()
     emailRequest.current = request
+
     const timer = window.setTimeout(async () => {
       try {
-        const available = await checkSignupEmail(addressToCheck, request.signal)
+        const isAvailable = await checkSignupEmail(addressToCheck, request.signal)
         if (!request.signal.aborted) {
           setEmailCheck({
             email: addressToCheck,
-            available,
-            message: available ? '사용 가능한 이메일입니다.' : '중복된 이메일입니다.',
+            available: isAvailable,
+            message: isAvailable ? '사용 가능한 이메일입니다.' : '중복된 이메일입니다.',
           })
         }
-      } catch (error) {
+      } catch (err) {
         if (!request.signal.aborted) {
           setEmailCheck({
             email: addressToCheck,
             available: false,
-            message: error instanceof ApiRequestError && error.status === 400
-              ? error.message
-              : '이메일을 확인하지 못했습니다. 입력을 수정한 뒤 다시 시도해 주세요.',
+            message:
+              err instanceof ApiRequestError && err.status === 400
+                ? err.message
+                : '이메일을 확인하지 못했습니다. 입력을 수정한 뒤 다시 시도해 주세요.',
           })
         }
       }
     }, 500)
+
     return () => {
       window.clearTimeout(timer)
       request.abort()
     }
   }, [email])
 
+  // ---------------------------------------------------------------------------
+  // 6. 다음(카카오) 우편번호 검색 모달
+  // ---------------------------------------------------------------------------
   function closeAddressSearch() {
     postcodeSession.current = null
     postcodeHost.current?.replaceChildren()
@@ -129,16 +200,19 @@ export default function SignupPage() {
     const dialog = postcodeDialog.current
     const host = postcodeHost.current
     if (!dialog || !host || dialog.open) return
+
     const session = Symbol()
     postcodeSession.current = session
-    // SDK 로딩 중 모달을 닫았다가 다시 열 수 있어, 이전 검색의 콜백이 새 화면을 변경하지 않게 구분합니다.
     const isCurrent = () => dialog.isConnected && dialog.open && postcodeSession.current === session
+
     dialog.showModal()
     setPostcodeMessage('주소 검색을 불러오는 중입니다.')
+
     try {
       const Postcode = await loadPostcode()
       if (!isCurrent()) return
       setPostcodeMessage('')
+
       new Postcode({
         width: '100%',
         height: '100%',
@@ -149,8 +223,8 @@ export default function SignupPage() {
             setPostcodeMessage('도로명 주소가 포함된 검색 결과를 선택해 주세요.')
             return
           }
-          // 선택한 우편번호와 도로명 주소를 각각 우편번호와 기본 주소 칸에 채웁니다.
-          // 새 배송지에 맞게 상세 주소를 비우고 해당 칸으로 포커스를 옮깁니다.
+
+          // 주소 자동 입력 후 상세주소 입력칸으로 포커스 이동
           setPostalCode(zonecode)
           setAddress(roadAddress)
           setDetail('')
@@ -164,26 +238,35 @@ export default function SignupPage() {
     }
   }
 
-  // 재입력 칸에서 벗어나기 전에 제출해도 불일치를 표시하고 요청을 막습니다.
-  // 필수 조건을 모두 충족하면 한 번만 요청하며, 201 응답 뒤 완료 안내를 엽니다.
+  // ---------------------------------------------------------------------------
+  // 7. 가입 양식 제출 핸들러
+  // ---------------------------------------------------------------------------
   async function submitSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitLock.current || completed) return
+
     setPasswordConfirmTouched(true)
     if (!passwordsMatch || !canSubmit) return
+
     setError(null)
-    // 상태 갱신이 화면에 반영되기 전 연속 제출도 막기 위해 pending과 별도로 즉시 잠급니다.
     submitLock.current = true
     setPending(true)
+
     try {
       await signUpCustomer({
-        email: normalizedEmail, password, name: name.trim(), phone, postalCode: postalCode.trim(),
-        address: address.trim(), detailAddress: detail.trim(), termsConsent,
+        email: normalizedEmail,
+        password,
+        name: name.trim(),
+        phone,
+        postalCode: postalCode.trim(),
+        address: address.trim(),
+        detailAddress: detail.trim(),
+        termsConsent,
       })
+
       setPassword('')
       setPasswordConfirm('')
       setCompleted(true)
-      // 완료 안내에서 확인을 누르면 스토어로 이동하고 기존 로그인 패널을 엽니다.
       successDialog.current?.showModal()
     } catch (cause) {
       if (cause instanceof ApiRequestError) {
@@ -200,12 +283,83 @@ export default function SignupPage() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 8. 피드백 메시지 처리
+  // ---------------------------------------------------------------------------
   const fields = error?.fields
-  const emailFeedback = fields?.email || (email && !emailValid ? '올바른 이메일 형식으로 입력해 주세요.'
-    : currentEmailCheck?.message || (emailValid ? '이메일 중복을 확인하고 있습니다.' : ''))
+  // 1) 이메일 피드백 (에러: 빨강 / 확인중: 회색 / 사용가능: 초록)
+  const getEmailFeedback = () => {
+    if (fields?.email) {
+      return { text: fields.email, color: 'text-red-700' }
+    }
+    if (email && !emailValid) {
+      return { text: '올바른 이메일 형식으로 입력해 주세요.', color: 'text-red-700' }
+    }
+    if (currentEmailCheck) {
+      return {
+        text: currentEmailCheck.message,
+        color: currentEmailCheck.available ? 'text-green-600' : 'text-red-700',
+      }
+    }
+    if (emailValid) {
+      return { text: '이메일 중복을 확인하고 있습니다.', color: 'text-zinc-500' }
+    }
+    return { text: '', color: '' }
+  }
+  const emailFeedback = getEmailFeedback()
+  // 2) 비밀번호 피드백 (미충족: 빨강 / 사용가능: 초록)
+  const getPasswordFeedback = () => {
+    if (fields?.password) {
+      return { text: fields.password, color: 'text-red-700' }
+    }
+    if (password && !passwordValid) {
+      return { text: '8~20자이며 영문과 숫자를 포함해야 합니다.', color: 'text-red-700' }
+    }
+    if (password && passwordValid) {
+      return { text: '사용 가능한 비밀번호입니다.', color: 'text-green-600' }
+    }
+    return { text: '', color: '' }
+  }
+  const passwordFeedback = getPasswordFeedback()
+  // 3) 비밀번호 확인 피드백 (입력하는 즉시 불일치: 빨강 / 일치: 초록)
+  const getPasswordConfirmFeedback = () => {
+    if (!passwordConfirm) {
+      return { text: '', color: '' }
+    }
+    if (password !== passwordConfirm) {
+      return { text: '비밀번호가 일치하지 않습니다.', color: 'text-red-700' }
+    }
+    return { text: '비밀번호가 일치합니다.', color: 'text-green-600' }
+  }
+  const passwordConfirmFeedback = getPasswordConfirmFeedback()
+  // 4) 전화번호 피드백 (미충족: 빨강 / 형식 일치: 초록)
+  const getPhoneFeedback = () => {
+    if (fields?.phoneNumber) {
+      return { text: fields.phoneNumber, color: 'text-red-700' }
+    }
+    if (phone && !phoneValid) {
+      return { text: '010으로 시작하는 11자리 연락처를 입력해 주세요.', color: 'text-red-700' }
+    }
+    return { text: '', color: '' }
+  }
+  const phoneFeedback = getPhoneFeedback()
+
+  // 5) 상세 주소 피드백 (기본 주소가 입력되었으나 상세 주소가 비었을 때: 빨강 / 입력 완료 시: 초록)
+  const getDetailAddressFeedback = () => {
+    if (fields?.['defaultAddress.detailAddress']) {
+      return { text: fields['defaultAddress.detailAddress'], color: 'text-red-700' }
+    }
+    // 기본 주소를 검색해 입력했으나 상세 주소가 비어있는 경우
+    if (address && !detail.trim()) {
+      return { text: '상세 주소를 입력해 주세요 (동·호수 등).', color: 'text-red-700' }
+    }
+    return { text: '', color: '' }
+  }
+  const detailAddressFeedback = getDetailAddressFeedback()
 
   return (
     <section className="mx-auto w-[min(92%,560px)] py-14 sm:py-20">
+      {/* 상단 헤더 */}
       <div className="mb-8 text-center">
         <p className="text-[10px] font-semibold tracking-[0.24em] text-zinc-500">
           MONO / KEYS · ACCOUNT
@@ -216,9 +370,11 @@ export default function SignupPage() {
         </p>
       </div>
 
+      {/* 가입 폼 */}
       <form className="space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-9" onSubmit={submitSignup}>
+        {/* 이메일 입력 및 중복 확인 */}
         <label className="block text-sm font-medium text-zinc-800">
-          이메일
+          이메일 *
           <input
             aria-describedby="signup-email-feedback"
             autoComplete="email"
@@ -237,13 +393,14 @@ export default function SignupPage() {
             type="email"
             value={email}
           />
-          <span className="mt-1 block text-xs text-zinc-600" id="signup-email-feedback" role="status">
-            {emailFeedback}
+          <span className={`mt-1 block text-xs ${emailFeedback.color}`} id="signup-email-feedback" role="status">
+            {emailFeedback.text}
           </span>
         </label>
 
+        {/* 비밀번호 입력 */}
         <label className="block text-sm font-medium text-zinc-800">
-          비밀번호
+          비밀번호 *
           <input
             aria-describedby="signup-password-feedback"
             autoComplete="new-password"
@@ -260,13 +417,16 @@ export default function SignupPage() {
             type="password"
             value={password}
           />
-          <span className="mt-1 block text-xs text-zinc-600" id="signup-password-feedback">
-            {fields?.password || (password && !passwordValid ? '8~20자이며 영문과 숫자를 포함해야 합니다.' : '')}
+          <span className={`mt-1 block text-xs ${passwordFeedback.color}`} id="signup-password-feedback">
+            {passwordFeedback.text}
           </span>
         </label>
 
+        {/* 비밀번호 확인 */}
         <div>
-          <label className="block text-sm font-medium text-zinc-800" htmlFor="signup-password-confirm">비밀번호 확인</label>
+          <label className="block text-sm font-medium text-zinc-800" htmlFor="signup-password-confirm">
+            비밀번호 확인 *
+          </label>
           <input
             aria-describedby="signup-password-confirm-feedback"
             aria-invalid={showPasswordMismatch}
@@ -292,21 +452,31 @@ export default function SignupPage() {
             type="password"
             value={passwordConfirm}
           />
-          <p className="mt-1 text-xs text-red-700" id="signup-password-confirm-feedback" role="status">
-            {showPasswordMismatch && '비밀번호가 일치하지 않습니다.'}
+          <p className={`mt-1 text-xs ${passwordConfirmFeedback.color}`} id="signup-password-confirm-feedback" role="status">
+            {passwordConfirmFeedback.text}
           </p>
         </div>
 
+        {/* 이름 입력 */}
         <label className="block text-sm font-medium text-zinc-800">
-          이름
-          <input autoComplete="name" className={inputClass} disabled={disabled} maxLength={50}
-            name="name" onChange={(event) => setName(event.target.value)} placeholder="이름을 입력해 주세요"
-            required value={name} />
+          이름 *
+          <input
+            autoComplete="name"
+            className={inputClass}
+            disabled={disabled}
+            maxLength={50}
+            name="name"
+            onChange={(event) => setName(event.target.value)}
+            placeholder="이름을 입력해 주세요"
+            required
+            value={name}
+          />
           {fields?.name && <span className="mt-1 block text-xs text-red-700">{fields.name}</span>}
         </label>
 
+        {/* 전화번호 입력 (숫자 입력 시 자동 하이픈 포맷 적용) */}
         <label className="block text-sm font-medium text-zinc-800">
-          전화번호
+          전화번호 *
           <input
             autoComplete="tel-national"
             className={inputClass}
@@ -319,17 +489,18 @@ export default function SignupPage() {
             placeholder="010-0000-0000"
             required
             type="tel"
-            value={[phone.slice(0, 3), phone.slice(3, 7), phone.slice(7)].filter(Boolean).join('-')}
+            value={formatPhoneNumber(phone)}
           />
           {(fields?.phoneNumber || (phoneTouched && !phoneValid)) && (
-            <span className="mt-1 block text-xs text-red-700">
-              {fields?.phoneNumber || '010으로 시작하는 11자리 연락처를 입력해 주세요.'}
+            <span className={`mt-1 block text-xs ${phoneFeedback.color}`}>
+              {phoneFeedback.text}
             </span>
           )}
         </label>
 
+        {/* 기본 배송지 (우편번호 검색 연동) */}
         <fieldset className="space-y-3 border-t border-zinc-200 pt-5" disabled={disabled}>
-          <legend className="text-sm font-medium text-zinc-800">기본배송지</legend>
+          <legend className="text-sm font-medium text-zinc-800">기본배송지 *</legend>
           <div className="flex items-center gap-2">
             <input
               aria-label="우편번호"
@@ -361,16 +532,21 @@ export default function SignupPage() {
             maxLength={255}
             name="detailAddress"
             onChange={(event) => setDetail(event.target.value)}
-            value={detail}
             placeholder="상세 주소 (동·호수 등)"
             ref={detailAddress}
             required
+            value={detail}
           />
-          {['defaultAddress', 'defaultAddress.zonecode', 'defaultAddress.roadAddress', 'defaultAddress.detailAddress'].map(
+          {/* 상세 주소 피드백 메시지 추가 */}
+          <span className={`mt-1 block text-xs ${detailAddressFeedback.color}`}>
+            {detailAddressFeedback.text}
+          </span>
+          {ADDRESS_ERROR_FIELDS.filter((f) => f !== 'defaultAddress.detailAddress').map(
             (field) => fields?.[field] && <p className="text-xs text-red-700" key={field}>{fields[field]}</p>,
           )}
         </fieldset>
 
+        {/* 필수 약관 동의 */}
         <fieldset className="space-y-3 border-t border-zinc-200 pt-5" disabled={disabled}>
           <legend className="text-sm font-medium text-zinc-800">약관 동의</legend>
           {terms.map(({ name, label, description }) => (
@@ -388,6 +564,9 @@ export default function SignupPage() {
                   type="checkbox"
                 />
                 {label} (필수)
+                {!termsConsent[name] &&
+                  <span className="text-xs text-red-700">체크해 주세요</span>
+                }
               </label>
               <details className="pl-6 text-xs leading-5 text-zinc-600">
                 <summary className="cursor-pointer">{label} 내용 보기</summary>
@@ -398,18 +577,23 @@ export default function SignupPage() {
           {fields?.termsConsent && <p className="text-xs text-red-700">{fields.termsConsent}</p>}
         </fieldset>
 
+        {/* 일반 에러 메시지 */}
         {error && (
-          <p className="rounded-md bg-red-50 px-4 py-3 text-sm leading-6 text-red-700" role="alert">{error.message}</p>
+          <p className="rounded-md bg-red-50 px-4 py-3 text-sm leading-6 text-red-700" role="alert">
+            {error.message}
+          </p>
         )}
 
+        {/* 제출 버튼 */}
         <button
-          className="h-13 w-full rounded-md bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-50"
+          className="h-13 w-full rounded-md bg-zinc-950 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled || !canSubmit}
           type="submit"
         >
           {pending ? '가입 요청 중…' : '회원가입'}
         </button>
 
+        {/* 로그인 링크 */}
         <p className="text-center text-sm text-zinc-500">
           이미 계정이 있으신가요?{' '}
           <Link className="font-semibold text-zinc-900 underline underline-offset-4" href="/?login=1">
@@ -418,11 +602,14 @@ export default function SignupPage() {
         </p>
       </form>
 
+      {/* 스토어 복귀 링크 */}
       <div className="mt-7 text-center">
         <Link className="text-xs font-medium tracking-[0.1em] text-zinc-500 hover:text-black" href="/">
           ← BACK TO STORE
         </Link>
       </div>
+
+      {/* 주소 검색 다이얼로그 모달 */}
       <dialog
         aria-labelledby="signup-postcode-title"
         className={dialogClass}
@@ -439,6 +626,8 @@ export default function SignupPage() {
         {postcodeMessage && <p className="text-sm text-zinc-700" role="status">{postcodeMessage}</p>}
         <div className="h-[min(55vh,440px)]" ref={postcodeHost} />
       </dialog>
+
+      {/* 가입 완료 안내 모달 */}
       <dialog
         aria-labelledby="signup-success"
         className={dialogClass}

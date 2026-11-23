@@ -1,18 +1,23 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import Image from 'next/image'
-import { CloseIcon, MinusIcon, PlusIcon } from '@/components/icons'
-import { useCart } from '@/features/cart/cart-provider'
-import { ProductDetailStory } from '@/features/products/product-detail-story'
-import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
+import { useState } from "react";
+import Image from "next/image";
+import { CloseIcon, MinusIcon, PlusIcon } from "@/components/icons";
+import { useCart } from "@/features/cart/cart-provider";
+import { ProductDetailStory } from "@/features/products/product-detail-story";
+import {
+  formatPrice,
+  isProductSoldOut,
+  mediaFrom,
+  type StoreProduct,
+} from "@/lib/store-shared";
 
 interface ProductDetailViewProps {
-  product: StoreProduct
+  product: StoreProduct;
 }
 
 export function ProductDetailView({ product }: ProductDetailViewProps) {
-  const { addItem } = useCart()
+  const { addItem } = useCart();
 
   // 갤러리 이미지 세트 (images 우선, 비어 있을 경우 galleryImages fallback)
   const rawImages = product.images.length
@@ -21,56 +26,57 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
         id: index + 1,
         url,
         alt: product.name,
-      }))
+      }));
 
   const images = rawImages.map((image, index) => ({
     id: image?.id ?? index + 1,
     url: image!.url as string,
     alt: image?.alt || `${product.name} 이미지 ${index + 1}`,
-  }))
+  }));
 
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [zoomOpen, setZoomOpen] = useState(false)
-  const safeImageIndex = images.length > 0 ? selectedImageIndex % images.length : 0
-  const currentImage = images[safeImageIndex]
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const safeImageIndex =
+    images.length > 0 ? selectedImageIndex % images.length : 0;
+  const currentImage = images[safeImageIndex];
 
   const handlePrevImage = () => {
-    if (images.length <= 1) return
-    setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length)
-  }
+    if (images.length <= 1) return;
+    setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
 
   const handleNextImage = () => {
-    if (images.length <= 1) return
-    setSelectedImageIndex((prev) => (prev + 1) % images.length)
-  }
+    if (images.length <= 1) return;
+    setSelectedImageIndex((prev) => (prev + 1) % images.length);
+  };
 
   // 단일 상품 가격
-  const unitPrice = product.basePrice
+  const unitPrice = product.basePrice;
 
   // 수량
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState(1);
 
   // 품절 상태
-  const isSoldOut = isProductSoldOut(product)
+  const isSoldOut = isProductSoldOut(product);
 
   // 수량 조절
   const handleDecreaseQuantity = () => {
-    setQuantity((prev) => Math.max(1, prev - 1))
-  }
+    setQuantity((prev) => Math.max(1, prev - 1));
+  };
 
   const handleIncreaseQuantity = () => {
     if (quantity >= product.stockQuantity) {
-      alert(`최대 주문 가능 수량은 ${product.stockQuantity}개입니다.`)
-      return
+      alert(`최대 주문 가능 수량은 ${product.stockQuantity}개입니다.`);
+      return;
     }
-    setQuantity((prev) => prev + 1)
-  }
+    setQuantity((prev) => prev + 1);
+  };
 
   // 장바구니 담기
   const handleAddToCart = () => {
     if (isSoldOut) {
-      alert('현재 품절되어 장바구니에 담을 수 없습니다.')
-      return
+      alert("현재 품절되어 장바구니에 담을 수 없습니다.");
+      return;
     }
 
     addItem({
@@ -81,8 +87,8 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
       unitPrice,
       shippingFee: product.shippingFee,
       quantity,
-    })
-  }
+    });
+  };
 
   return (
     <>
@@ -100,7 +106,7 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
                 <Image
                   alt={currentImage.alt || product.name}
                   className={`object-cover transition-all duration-300 group-hover:scale-[1.02] ${
-                    isSoldOut ? 'opacity-60' : ''
+                    isSoldOut ? "opacity-60" : ""
                   }`}
                   fill
                   priority
@@ -121,8 +127,8 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
                   aria-label="이전 이미지"
                   className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-lg font-medium text-zinc-900 shadow-sm backdrop-blur transition hover:bg-white"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    handlePrevImage()
+                    e.stopPropagation();
+                    handlePrevImage();
                   }}
                   type="button"
                 >
@@ -132,8 +138,8 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
                   aria-label="다음 이미지"
                   className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-lg font-medium text-zinc-900 shadow-sm backdrop-blur transition hover:bg-white"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    handleNextImage()
+                    e.stopPropagation();
+                    handleNextImage();
                   }}
                   type="button"
                 >
@@ -167,13 +173,13 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
           {images.length > 1 && (
             <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-6">
               {images.slice(0, 8).map((image, index) => {
-                const isSelected = safeImageIndex === index
+                const isSelected = safeImageIndex === index;
                 return (
                   <button
                     className={`relative aspect-square overflow-hidden rounded-md bg-zinc-100 transition ${
                       isSelected
-                        ? 'ring-2 ring-zinc-950 ring-offset-2'
-                        : 'opacity-70 hover:opacity-100'
+                        ? "ring-2 ring-zinc-950 ring-offset-2"
+                        : "opacity-70 hover:opacity-100"
                     }`}
                     key={image.id || index}
                     onClick={() => setSelectedImageIndex(index)}
@@ -187,125 +193,136 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
                       src={image.url}
                     />
                   </button>
-                )
+                );
               })}
             </div>
           )}
         </div>
 
-      {/* 우측: 상품 정보 및 주문 컨트롤 */}
-      <div className="lg:sticky lg:top-28 lg:self-start">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-          {product.brand} / {product.category.replace('-', ' ')}
-          {product.subCategoryName ? ` · ${product.subCategoryName}` : ''}
-        </p>
-        <h1 className="mt-5 text-5xl font-medium leading-none tracking-[-0.06em]">
-          {product.name}
-        </h1>
+        {/* 우측: 상품 정보 및 주문 컨트롤 */}
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            {product.brand} / {product.category.replace("-", " ")}
+            {product.subCategoryName ? ` · ${product.subCategoryName}` : ""}
+          </p>
+          <h1 className="mt-5 text-5xl font-medium leading-none tracking-[-0.06em]">
+            {product.name}
+          </h1>
 
-        <div className="mt-6 flex items-baseline gap-3">
-          <p className="text-2xl font-medium">{formatPrice(unitPrice)}</p>
-        </div>
+          <div className="mt-6 flex items-baseline gap-3">
+            <p className="text-2xl font-medium">{formatPrice(unitPrice)}</p>
+          </div>
 
-        <p className="my-8 border-y border-zinc-200 py-6 text-base leading-7 text-zinc-600">
-          {product.description}
-        </p>
+          <p className="my-8 border-y border-zinc-200 py-6 text-base leading-7 text-zinc-600">
+            {product.description}
+          </p>
 
-        {/* 수량 및 장바구니 담기 */}
-        <div className="flex gap-3">
-          <div className="flex h-14 items-center rounded-md border border-zinc-200">
+          {/* 수량 및 장바구니 담기 */}
+          <div className="flex gap-3">
+            <div className="flex h-14 items-center rounded-md border border-zinc-200">
+              <button
+                aria-label="Decrease quantity"
+                className="h-full px-3 text-zinc-600 hover:text-black disabled:opacity-40"
+                disabled={isSoldOut}
+                onClick={handleDecreaseQuantity}
+                type="button"
+              >
+                <MinusIcon />
+              </button>
+              <span className="w-8 text-center text-sm font-medium">
+                {quantity}
+              </span>
+              <button
+                aria-label="Increase quantity"
+                className="h-full px-3 text-zinc-600 hover:text-black disabled:opacity-40"
+                disabled={isSoldOut}
+                onClick={handleIncreaseQuantity}
+                type="button"
+              >
+                <PlusIcon />
+              </button>
+            </div>
+
             <button
-              aria-label="Decrease quantity"
-              className="h-full px-3 text-zinc-600 hover:text-black disabled:opacity-40"
+              className={`h-14 flex-1 rounded-md px-6 text-sm font-semibold tracking-wide transition ${
+                isSoldOut
+                  ? "cursor-not-allowed bg-zinc-200 text-zinc-400"
+                  : "bg-zinc-950 text-white hover:bg-zinc-800 active:scale-[0.99]"
+              }`}
               disabled={isSoldOut}
-              onClick={handleDecreaseQuantity}
+              onClick={handleAddToCart}
               type="button"
             >
-              <MinusIcon />
-            </button>
-            <span className="w-8 text-center text-sm font-medium">{quantity}</span>
-            <button
-              aria-label="Increase quantity"
-              className="h-full px-3 text-zinc-600 hover:text-black disabled:opacity-40"
-              disabled={isSoldOut}
-              onClick={handleIncreaseQuantity}
-              type="button"
-            >
-              <PlusIcon />
+              {isSoldOut
+                ? "SOLD OUT"
+                : `ADD TO CART — ${formatPrice(unitPrice * quantity)}`}
             </button>
           </div>
 
-          <button
-            className={`h-14 flex-1 rounded-md px-6 text-sm font-semibold tracking-wide transition ${
-              isSoldOut
-                ? 'cursor-not-allowed bg-zinc-200 text-zinc-400'
-                : 'bg-zinc-950 text-white hover:bg-zinc-800 active:scale-[0.99]'
-            }`}
-            disabled={isSoldOut}
-            onClick={handleAddToCart}
-            type="button"
-          >
-            {isSoldOut ? 'SOLD OUT' : `ADD TO CART — ${formatPrice(unitPrice * quantity)}`}
-          </button>
+          {/* 제품 사양 및 상세 정보 */}
+          <dl className="mt-10 grid grid-cols-2 gap-y-4 border-t border-zinc-200 pt-7 text-sm">
+            <dt className="text-zinc-500">Stock</dt>
+            <dd className="text-right font-medium">
+              {isSoldOut
+                ? "Out of stock"
+                : `${product.stockQuantity} available`}
+            </dd>
+
+            <dt className="text-zinc-500">Shipping</dt>
+            <dd className="text-right">
+              {product.shippingFee
+                ? formatPrice(product.shippingFee)
+                : "Complimentary"}
+            </dd>
+
+            {product.category === "keycaps" ? (
+              <>
+                <dt className="text-zinc-500">Layout</dt>
+                <dd className="text-right font-medium">
+                  풀배열 공용 (모든 배열 호환)
+                </dd>
+              </>
+            ) : product.layout ? (
+              <>
+                <dt className="text-zinc-500">Layout</dt>
+                <dd className="text-right font-medium">{product.layout}%</dd>
+              </>
+            ) : null}
+
+            {product.pin && (
+              <>
+                <dt className="text-zinc-500">Pin spec</dt>
+                <dd className="text-right font-medium">{product.pin} Pin</dd>
+              </>
+            )}
+
+            {product.supportPins && product.supportPins.length > 0 && (
+              <>
+                <dt className="text-zinc-500">Supported Pins</dt>
+                <dd className="text-right font-medium">
+                  {product.supportPins.join(", ")} Pin
+                </dd>
+              </>
+            )}
+
+            {product.switchType && (
+              <>
+                <dt className="text-zinc-500">Switch Type</dt>
+                <dd className="text-right font-medium uppercase">
+                  {product.switchType}
+                </dd>
+              </>
+            )}
+
+            {product.material && (
+              <>
+                <dt className="text-zinc-500">Material</dt>
+                <dd className="text-right font-medium">{product.material}</dd>
+              </>
+            )}
+          </dl>
         </div>
-
-        {/* 제품 사양 및 상세 정보 */}
-        <dl className="mt-10 grid grid-cols-2 gap-y-4 border-t border-zinc-200 pt-7 text-sm">
-          <dt className="text-zinc-500">Stock</dt>
-          <dd className="text-right font-medium">
-            {isSoldOut ? 'Out of stock' : `${product.stockQuantity} available`}
-          </dd>
-
-          <dt className="text-zinc-500">Shipping</dt>
-          <dd className="text-right">
-            {product.shippingFee ? formatPrice(product.shippingFee) : 'Complimentary'}
-          </dd>
-
-          {product.category === 'keycaps' ? (
-            <>
-              <dt className="text-zinc-500">Layout</dt>
-              <dd className="text-right font-medium">풀배열 공용 (모든 배열 호환)</dd>
-            </>
-          ) : product.layout ? (
-            <>
-              <dt className="text-zinc-500">Layout</dt>
-              <dd className="text-right font-medium">{product.layout}%</dd>
-            </>
-          ) : null}
-
-          {product.pin && (
-            <>
-              <dt className="text-zinc-500">Pin spec</dt>
-              <dd className="text-right font-medium">{product.pin} Pin</dd>
-            </>
-          )}
-
-          {product.supportPins && product.supportPins.length > 0 && (
-            <>
-              <dt className="text-zinc-500">Supported Pins</dt>
-              <dd className="text-right font-medium">{product.supportPins.join(', ')} Pin</dd>
-            </>
-          )}
-
-          {product.switchType && (
-            <>
-              <dt className="text-zinc-500">Switch Type</dt>
-              <dd className="text-right font-medium uppercase">{product.switchType}</dd>
-            </>
-          )}
-
-          {product.material && (
-            <>
-              <dt className="text-zinc-500">Material</dt>
-              <dd className="text-right font-medium">{product.material}</dd>
-            </>
-          )}
-
-          <dt className="text-zinc-500">KC certification</dt>
-          <dd className="text-right">{product.kcCertificationNumber || 'Not applicable'}</dd>
-        </dl>
       </div>
-    </div>
 
       {/* 하단 스크롤 상세 콘텐츠 */}
       <ProductDetailStory galleryImages={images} product={product} />
@@ -374,5 +391,5 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
         </div>
       )}
     </>
-  )
+  );
 }

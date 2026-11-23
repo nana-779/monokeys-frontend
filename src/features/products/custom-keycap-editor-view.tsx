@@ -13,7 +13,10 @@ import {
 import Link from 'next/link'
 import { MinusIcon, PlusIcon } from '@/components/icons'
 import { useCart } from '@/features/cart/cart-provider'
-import { uploadCustomKeycapImages } from '@/features/products/custom-keycap-api'
+import {
+  deleteCustomKeycapImage,
+  uploadCustomKeycapImages,
+} from '@/features/products/custom-keycap-api'
 import { KeyboardMountPreview } from '@/features/products/custom-keycap-preview'
 import { ApiRequestError, apiRequest } from '@/lib/api-client'
 import {
@@ -86,7 +89,7 @@ type DragState =
     }
 
 export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps) {
-  const { addItem } = useCart()
+  const { items: cartItems, addItem } = useCart()
   const meta = useMemo(() => resolveKeycapMeta(product.name), [product.name])
   const isSoldOut = isProductSoldOut(product)
   const draftStorageKey = useMemo(() => getDraftStorageKey(product.id), [product.id])
@@ -1087,6 +1090,13 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
       alert('이미지 업로드, 문구 입력, 또는 인쇄 배경색 선택으로 디자인을 완성해 주세요.')
       return
     }
+    const existingCartQty = cartItems
+      .filter((item) => item.productId === String(product.id))
+      .reduce((sum, item) => sum + item.quantity, 0)
+    if (existingCartQty + quantity > product.stockQuantity) {
+      alert(`${product.name}의 현재 재고수는 ${product.stockQuantity}개입니다.`)
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -1101,9 +1111,11 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
       return
     }
 
+    let uploadedUrls: string[] = []
     try {
       const printBlob = await exportCanvasBlob(false)
       const uploaded = await uploadCustomKeycapImages(printBlob)
+      uploadedUrls = Array.from(new Set([uploaded.imageUrl, uploaded.previewImageUrl].filter(Boolean)))
 
       const primaryText = nonEmptyTexts[0] ?? null
       const designPayload = {
@@ -1140,9 +1152,13 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
         customDesignData: JSON.stringify(designPayload),
       })
       if (!added) {
+        await Promise.allSettled(uploadedUrls.map((url) => deleteCustomKeycapImage(url)))
         return
       }
     } catch (err) {
+      if (uploadedUrls.length > 0) {
+        await Promise.allSettled(uploadedUrls.map((url) => deleteCustomKeycapImage(url)))
+      }
       alert(err instanceof Error ? err.message : '커스텀 키캡을 장바구니에 담지 못했습니다.')
     } finally {
       setSubmitting(false)

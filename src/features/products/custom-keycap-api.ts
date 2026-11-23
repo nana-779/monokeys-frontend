@@ -35,3 +35,15 @@ export async function uploadCustomKeycapImages(
   }
   return result.data
 }
+
+/**
+ * 장바구니 담기 실패/취소 시 방금 업로드된 미참조 커스텀 키캡 이미지를 서버에서 정리합니다.
+ */
+export async function deleteCustomKeycapImage(imageUrl: string): Promise<void> {
+  if (!imageUrl.trim()) return
+  const params = new URLSearchParams({ imageUrl })
+  await fetch(`${API_BASE_URL}/api/custom-keycaps/images?${params.toString()}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  }).catch(() => undefined)
+}

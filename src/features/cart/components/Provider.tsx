@@ -25,7 +25,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
   }, [refreshCart]);
 
   // 2. 장바구니 상품 추가 (단일 상품 / 커스텀 빌드 공통)
-  async function handleAddProduct(newProduct: ProductType): Promise<boolean> {
+  async function handleAddCart(newProduct: ProductType): Promise<boolean> {
     const isCustom = Boolean(
       (newProduct.manualBuildId && newProduct.manualBuildId > 0) ||
       (newProduct.autoBuildId && newProduct.autoBuildId > 0) ||
@@ -138,7 +138,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
         products,
         handleUpdateCount,
         handleRemoveProduct,
-        handleAddProduct,
+        handleAddCart,
         handleClearCart,
         refreshCart,
         setProducts,

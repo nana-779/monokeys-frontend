@@ -36,7 +36,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const products: ProductType[] = cartCtx?.products || [];
   const handleUpdateCount = cartCtx?.handleUpdateCount;
   const handleClearCart = cartCtx?.handleClearCart;
-  const handleAddProduct = cartCtx?.handleAddProduct;
+  const handleAddCart = cartCtx?.handleAddCart;
 
   const items = useMemo<CartItem[]>(() => {
     return products.map((p) => {
@@ -68,13 +68,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, deselectedIds]);
 
   const addItem = useCallback(async (item: CartItem) => {
-    if (handleAddProduct) {
+    if (handleAddCart) {
       const manualBuildId = item.manualBuildId;
       const autoBuildId = item.autoBuildId;
       const isCustom = Boolean(manualBuildId || autoBuildId || item.buildType);
       const effectiveProductId = Number(item.productId) || (manualBuildId ? -manualBuildId : (autoBuildId ? -autoBuildId : 0));
 
-      const isSuccess = await handleAddProduct({
+      const isSuccess = await handleAddCart({
         productId: effectiveProductId,
         name: item.name,
         price: item.unitPrice,
@@ -96,7 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setCartOpen(true);
       }
     }
-  }, [handleAddProduct]);
+  }, [handleAddCart]);
 
   const updateQuantity = useCallback((index: number, quantity: number) => {
     const item = items[index];

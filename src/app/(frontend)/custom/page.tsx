@@ -331,15 +331,6 @@ export default function CustomBuilderPage() {
       })
 
       openCart()
-      alert(
-        `[커스텀 키보드 빌드 #${buildId} 저장 완료]\n` +
-          `- 하우징: ${build.housing.name} (${build.housing.layout || ''}%)\n` +
-          `- 기판: ${build.pcb.name}\n` +
-          `- 스위치: ${build.switchPart.name}\n` +
-          `- 키캡: ${build.keycap.name}${build.keycap.selectedOption ? ` (${build.keycap.selectedOption.optionName})` : ''}\n` +
-          `${saved.includeAssembly ? `+ 조립 대행 공임비 (${formatPrice(saved.assemblyFee)})\n` : ''}\n` +
-          `서버 확정 총액 ${formatPrice(saved.totalPrice)}이 장바구니에 담겼습니다.`,
-      )
     } catch (err) {
       alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')
     } finally {

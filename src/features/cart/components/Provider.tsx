@@ -56,7 +56,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       p.cartItemId ? p.cartItemId === id : p.productId === id
     );
     if (targetProduct && newQuantity > targetProduct.stockQuantity) {
-      alert(`${targetProduct.name}의 현재 재고수는 ${targetProduct.stockQuantity}개입니다.`);
+      alert("재고수를 초과합니다.");
       finalQuantity = targetProduct.stockQuantity;
     }
     setProducts((prevProducts) =>
@@ -66,12 +66,8 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
           : product
       )
     );
-    const success = await changeCartItem(id, finalQuantity);
-    if (success) {
-      await refreshCart(); // 👈 수량 변경 성공 시 최신화
-    } else {
-      await refreshCart();
-    }
+    await changeCartItem(id, finalQuantity);
+    await refreshCart(); // 수량 변경 성공 시 최신화
   }
   // 4. 장바구니 상품 단건 삭제
   async function handleRemoveProduct(id: number) {
@@ -82,8 +78,8 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       )
     );
     // 백엔드 삭제 요청 후 무조건 장바구니 새로고침
-    const success = await removeCartItemApi(id);
-    await refreshCart(); // 👈 삭제 후 반드시 백엔드 최신 상태로 갱신
+    await removeCartItemApi(id);
+    await refreshCart(); // 삭제 후 반드시 백엔드 최신 상태로 갱신
   }
 
   // 5. 장바구니 전체 비우기

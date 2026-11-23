@@ -57,7 +57,6 @@ function WithdrawalForm({ onComplete, session }: {
   session: WithdrawalSession | null
 }) {
   const [password, setPassword] = useState('')
-  const [verified, setVerified] = useState(false)
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const activeRequest = useRef<AbortController | null>(null)
@@ -74,13 +73,15 @@ function WithdrawalForm({ onComplete, session }: {
     const request = new AbortController()
     activeRequest.current = request
     setPending(true)
-    setVerified(false)
     setMessage('')
     try {
       const matches = await verifyWithdrawalPassword(password, request.signal)
       if (request.signal.aborted) return
-      setVerified(matches)
-      setMessage(matches ? '비밀번호를 확인했습니다.' : '비밀번호가 일치하지 않습니다.')
+      if (matches) {
+        confirmation.current?.showModal()
+      } else {
+         setMessage('비밀번호가 일치하지 않습니다.')
+      }
     } catch (error) {
       if (!request.signal.aborted) setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
     } finally {
@@ -91,7 +92,7 @@ function WithdrawalForm({ onComplete, session }: {
 
   // 모달에서 확정한 경우에만 최종 탈퇴를 요청합니다. 서버가 현재 비밀번호를 다시 확인합니다.
   async function withdraw() {
-    if (!session || !verified || activeRequest.current) return
+    if (!session || activeRequest.current) return
     const request = new AbortController()
     activeRequest.current = request
     setPending(true)
@@ -104,7 +105,6 @@ function WithdrawalForm({ onComplete, session }: {
     } catch (error) {
       if (request.signal.aborted) return
       confirmation.current?.close()
-      setVerified(false)
       setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
     } finally {
       activeRequest.current = null
@@ -123,34 +123,36 @@ function WithdrawalForm({ onComplete, session }: {
         {session ? (
           <>
             <form className="space-y-3" onSubmit={verifyPassword}>
-              <label className="block text-sm font-medium" htmlFor="withdrawal-password">현재 비밀번호</label>
-              <input
-                autoComplete="current-password"
-                className="h-12 w-full rounded-md border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
-                disabled={pending}
-                id="withdrawal-password"
-                onChange={(event) => {
-                  setPassword(event.target.value)
-                  setVerified(false)
-                  setMessage('')
-                }}
-                required
-                type="password"
-                value={password}
-              />
-              <button className={outlineButton} disabled={pending || !password.trim()} type="submit">
-                비밀번호 확인
+              <div>
+                <label className="block text-sm font-medium" htmlFor="withdrawal-password">현재 비밀번호</label>
+                <input
+                  autoComplete="current-password"
+                  className="h-12 w-full rounded-md border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-950"
+                  disabled={pending}
+                  id="withdrawal-password"
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    setMessage('')
+                  }}
+                  placeholder="현재 비밀번호를 입력해 주세요"
+                  required
+                  type="password"
+                  value={password}
+                />
+                {message && (
+                  <p className="mt-1 text-xs text-red-700" role="alert">
+                    {message}
+                  </p>
+                )}
+              </div>
+              <button
+                className={`${primaryButton} w-full disabled:cursor-not-allowed`}
+                disabled={pending || !password.trim()}
+                type="submit"
+              >
+                {pending ? '확인 중…' : '회원탈퇴'}
               </button>
             </form>
-            {message && <p className={verified ? 'text-sm' : 'text-sm text-red-700'} role={verified ? 'status' : 'alert'}>{message}</p>}
-            <button
-              className={primaryButton}
-              disabled={!verified || pending}
-              onClick={() => confirmation.current?.showModal()}
-              type="button"
-            >
-              최종 탈퇴 확인
-            </button>
           </>
         ) : (
           <p className="text-sm text-zinc-600">
@@ -170,7 +172,7 @@ function WithdrawalForm({ onComplete, session }: {
         <p className="mt-3 text-sm text-zinc-600">회원탈퇴를 진행하시겠습니까?</p>
         <div className="mt-6 flex justify-end gap-2">
           <button className={outlineButton} disabled={pending} onClick={() => confirmation.current?.close()} type="button">취소</button>
-          <button className={primaryButton} disabled={pending || !verified} onClick={withdraw} type="button">
+          <button className={primaryButton} disabled={pending} onClick={withdraw} type="button">
             {pending ? '처리 중…' : '탈퇴하기'}
           </button>
         </div>

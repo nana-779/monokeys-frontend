@@ -22,22 +22,61 @@ export class ApiRequestError extends Error {
   }
 }
 
+// 재발급을 시도하지 않는 경로입니다. 로그인 실패·재발급 실패의 401은 재발급으로 해결되지 않습니다.
+const NO_REFRESH_PATHS = ["/api/auth/login", "/api/auth/logout", "/api/auth/refresh"];
+
+// 진행 중인 재발급 요청입니다. 여러 요청이 동시에 401을 받아도 재발급은 한 번만 보냅니다.
+let refreshPromise: Promise<boolean> | null = null;
+
+// Refresh Token 쿠키로 새 Access Token을 발급받습니다. 성공하면 true를 반환합니다.
+function refreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+// 브라우저에서 보낸 요청이고 재발급 제외 경로가 아닐 때만 재발급을 시도합니다.
+// Next.js 서버에서 보낸 요청에는 브라우저 쿠키가 없어 재발급할 수 없습니다.
+function canRefresh(path: string): boolean {
+  return typeof window !== "undefined" && !NO_REFRESH_PATHS.some((p) => path.startsWith(p));
+}
+
 // 모든 API 요청에 JSON 헤더와 세션 쿠키를 공통 적용합니다.
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
   expectedStatus?: number,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    cache: 'no-store',
-    ...init,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...init.headers,
-    },
-  });
+  // 같은 요청을 재발급 후 한 번 더 보낼 수 있도록 요청 부분을 함수로 분리합니다.
+  const send = () =>
+    fetch(`${API_BASE_URL}${path}`, {
+      cache: 'no-store',
+      ...init,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...init.headers,
+      },
+    });
+
+  let response = await send();
+
+  // Access Token 만료로 401이면 재발급 후 원래 요청을 한 번만 다시 보냅니다.
+  // 재발급에 실패하면 다시 보내지 않고, 아래에서 기존과 같이 401 오류를 던집니다.
+  if (response.status === 401 && canRefresh(path)) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) response = await send();
+  }
 
   if (!response.ok) {
     let detail = "";

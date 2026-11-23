@@ -71,9 +71,12 @@ export async function apiRequest<T>(
 
   let response = await send();
 
+  // 본문이 없거나 문자열일 때만 다시 보낼 수 있습니다. (스트림 등은 첫 전송에서 소진됨)
+  const canResend = init.body == null || typeof init.body === "string";
+
   // Access Token 만료로 401이면 재발급 후 원래 요청을 한 번만 다시 보냅니다.
   // 재발급에 실패하면 다시 보내지 않고, 아래에서 기존과 같이 401 오류를 던집니다.
-  if (response.status === 401 && canRefresh(path)) {
+  if (response.status === 401 && canRefresh(path) && canResend) {
     const refreshed = await refreshAccessToken();
     if (refreshed) response = await send();
   }

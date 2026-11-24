@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { getCurrentUser } from '@/features/auth/api'
+import { ProfileForm } from '@/features/user/profile-form'
 import { useWithdrawalSession } from '@/features/user/withdrawal-session'
 
 const cardClass = 'rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-9'
@@ -17,7 +18,8 @@ export default function ProfilePage() {
       {session ? (
         // 다른 계정으로 바뀌거나 다시 로그인하면 입력 중이던 값이 남지 않도록 영역 전체를 새로 그립니다.
         <div key={`${session.user.id}-${session.sessionVersion}`} className="grid gap-6">
-          {/* 회원정보 수정 폼, 비밀번호 변경 폼 */}
+          <ProfileForm session={session} />
+          {/* 비밀번호 변경 폼 */}
         </div>
       ) : (
         <SignedOutNotice />

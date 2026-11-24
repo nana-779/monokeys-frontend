@@ -12,9 +12,14 @@ export default function MyPage() {
       <h1 className="mb-8 text-center text-4xl font-medium tracking-[-0.06em] sm:text-5xl">마이페이지</h1>
       <div className="space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-9">
         {session ? (
-          <Link className="text-sm font-semibold underline underline-offset-4" href="/user/delete-account">
-            회원탈퇴
-          </Link>
+          <div className="flex flex-col items-start gap-5">
+            <Link className="text-sm font-semibold underline underline-offset-4" href="/mypage/orders">
+              주문 내역
+            </Link>
+            <Link className="text-sm font-semibold underline underline-offset-4" href="/user/delete-account">
+              회원 탈퇴
+            </Link>
+          </div>
         ) : (
           <p className="text-sm text-zinc-600">
             마이페이지를 이용하려면 로그인해 주세요.{' '}

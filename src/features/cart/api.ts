@@ -4,6 +4,7 @@ import type { ProductType } from './interface/Product'
 export type AddCartItemRequest = {
   productId: string
   quantity: number
+  customDesignData?: string
 }
 
 // 백엔드가 내려주는 장바구니 아이템 응답 타입
@@ -14,6 +15,35 @@ export type CartItemResponse = {
   price: number
   quantity: number
   thumbnailUrl?: string
+  customDesignData?: string
+}
+
+function parseCustomDesignMeta(customDesignData?: string): {
+  previewUrl?: string
+  label?: string
+} {
+  if (!customDesignData) return {}
+  try {
+    const parsed = JSON.parse(customDesignData) as {
+      previewImageUrl?: string
+      printImageUrl?: string
+      keyType?: string
+      keySize?: string
+      customText?: string | null
+    }
+    const previewUrl =
+      typeof parsed.previewImageUrl === 'string' && parsed.previewImageUrl.trim()
+        ? parsed.previewImageUrl
+        : typeof parsed.printImageUrl === 'string' && parsed.printImageUrl.trim()
+          ? parsed.printImageUrl
+          : undefined
+    const spec = [parsed.keyType, parsed.keySize].filter(Boolean).join(' · ')
+    const textSnippet = parsed.customText ? ` · "${parsed.customText}"` : ''
+    const label = spec ? `커스텀 (${spec})${textSnippet}` : '커스텀 디자인'
+    return { previewUrl, label }
+  } catch {
+    return {}
+  }
 }
 
 // 1. 내 장바구니 목록 조회 (GET /api/cart)
@@ -22,19 +52,29 @@ export async function getCartApi(): Promise<ProductType[]> {
     const res = await apiRequest<any>('/api/cart')
     const list = res?.data || res || []
     if (Array.isArray(list)) {
-      return list.map((item: any) => ({
-        productId: item.productId ?? item.product?.productId ?? item.id,
-        name: item.name ?? item.product?.name ?? '',
-        price: item.price ?? item.product?.basePrice ?? 0,
-        stockQuantity: item.stockQuantity ?? item.product?.stockQuantity ?? 999,
-        quantity: item.quantity ?? 1,
-        thumbnailUrl: item.thumbnailUrl ?? item.product?.thumbnailURL ?? '',
-        partType: item.partType ?? '',
-        additionalPrice: item.additionalPrice ?? 0,
-        customBuildId: item.customBuildId ?? 0,
-        buildName: item.buildName ?? '',
-        includeAssembly: item.includeAssembly ?? false,
-      }))
+      return list.map((item: any) => {
+        const customDesignData =
+          typeof item.customDesignData === 'string' && item.customDesignData.trim()
+            ? item.customDesignData
+            : undefined
+        const customMeta = parseCustomDesignMeta(customDesignData)
+        return {
+          cartItemId: item.cartItemId,
+          productId: item.productId ?? item.product?.productId ?? item.id,
+          name: item.name ?? item.product?.name ?? '',
+          price: item.price ?? item.product?.basePrice ?? 0,
+          stockQuantity: item.stockQuantity ?? item.product?.stockQuantity ?? 999,
+          quantity: item.quantity ?? 1,
+          thumbnailUrl:
+            customMeta.previewUrl ?? item.thumbnailUrl ?? item.product?.thumbnailURL ?? '',
+          partType: item.partType ?? '',
+          additionalPrice: item.additionalPrice ?? 0,
+          customBuildId: item.customBuildId ?? 0,
+          buildName: item.buildName || customMeta.label || '',
+          includeAssembly: item.includeAssembly ?? false,
+          customDesignData,
+        }
+      })
     }
     return []
   } catch (error) {
@@ -48,11 +88,17 @@ export async function getCartApi(): Promise<ProductType[]> {
 }
 
 // 2. 장바구니에 상품 담기 (POST /api/cart)
-export async function addCartItemApi(productId: number, quantity: number): Promise<boolean> {
+export async function addCartItemApi(
+  productId: number,
+  quantity: number,
+  customDesignData?: string,
+): Promise<boolean> {
   try {
     await apiRequest('/api/cart', {
       method: 'POST',
-      body: JSON.stringify({ productId, quantity }),
+      body: JSON.stringify(
+        customDesignData ? { productId, quantity, customDesignData } : { productId, quantity },
+      ),
     })
     return true
   } catch (error) {
@@ -72,10 +118,16 @@ export async function addCartItemApi(productId: number, quantity: number): Promi
   }
 }
 
-// 3. 장바구니 수량 변경 (PATCH /api/cart/{productId})
-export async function changeCartItem(productId: number, quantity: number): Promise<boolean> {
+// 3. 장바구니 수량 변경 (PATCH /api/cart/{productId} 또는 /api/cart/items/{cartItemId})
+export async function changeCartItem(
+  productId: number,
+  quantity: number,
+  cartItemId?: number,
+): Promise<boolean> {
   try {
-    await apiRequest(`/api/cart/${productId}`, {
+    const endpoint =
+      cartItemId && cartItemId > 0 ? `/api/cart/items/${cartItemId}` : `/api/cart/${productId}`
+    await apiRequest(endpoint, {
       method: 'PATCH',
       body: JSON.stringify({ quantity }),
     })
@@ -97,10 +149,15 @@ export async function changeCartItem(productId: number, quantity: number): Promi
   }
 }
 
-// 4. 장바구니 단건 삭제 (DELETE /api/cart/{productId})
-export async function removeCartItemApi(productId: number): Promise<boolean> {
+// 4. 장바구니 단건 삭제 (DELETE /api/cart/{productId} 또는 /api/cart/items/{cartItemId})
+export async function removeCartItemApi(
+  productId: number,
+  cartItemId?: number,
+): Promise<boolean> {
   try {
-    await apiRequest(`/api/cart/${productId}`, {
+    const endpoint =
+      cartItemId && cartItemId > 0 ? `/api/cart/items/${cartItemId}` : `/api/cart/${productId}`
+    await apiRequest(endpoint, {
       method: 'DELETE',
     })
     return true

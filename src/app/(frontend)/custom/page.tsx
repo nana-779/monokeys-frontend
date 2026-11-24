@@ -16,11 +16,8 @@ import {
 } from '@/features/products/builds-api'
 import type { Product } from '@/features/products/types'
 import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
-<<<<<<< HEAD
 import { ProductCartContext } from '@/features/cart/components/CartContext'
-=======
 import { ApiRequestError, apiRequest } from '@/lib/api-client'
->>>>>>> e05b44f7d56f51a1f5e2ed93ea64b81981d30515
 
 function mapBuildItemToProduct(item: BuildItemResponse, catalog: Product[]): Product {
   const catalogMatch = catalog.find((p) => p.productId === item.productId)
@@ -389,18 +386,6 @@ export default function CustomBuilderPage() {
       })
 
       openCart()
-<<<<<<< HEAD
-=======
-      alert(
-        `[커스텀 키보드 빌드 #${buildId} 저장 완료]\n` +
-        `- 하우징: ${build.housing.name} (${build.housing.layout || ''}%)\n` +
-        `- 기판: ${build.pcb.name}\n` +
-        `- 스위치: ${build.switchPart.name}\n` +
-        `- 키캡: ${build.keycap.name}${build.keycap.selectedOption ? ` (${build.keycap.selectedOption.optionName})` : ''}\n` +
-        `${saved.includeAssembly ? `+ 조립 대행 공임비 (${formatPrice(saved.assemblyFee)})\n` : ''}\n` +
-        `서버 확정 총액 ${formatPrice(saved.totalPrice)}이 장바구니에 담겼습니다.`,
-      )
->>>>>>> e05b44f7d56f51a1f5e2ed93ea64b81981d30515
     } catch (err) {
       alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')
     } finally {

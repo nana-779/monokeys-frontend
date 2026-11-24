@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { CloseIcon, MinusIcon, PlusIcon } from "@/components/icons";
 import { useCart } from "@/features/cart/cart-provider";
+import { CustomKeycapEditorView } from "@/features/products/custom-keycap-editor-view";
 import { ProductDetailStory } from "@/features/products/product-detail-story";
 import {
   formatPrice,
@@ -17,16 +18,24 @@ interface ProductDetailViewProps {
 }
 
 export function ProductDetailView({ product }: ProductDetailViewProps) {
+  if (product.categoryId === "keycap-custom") {
+    return <CustomKeycapEditorView product={product} />;
+  }
+
+  return <StandardProductDetailView product={product} />;
+}
+
+function StandardProductDetailView({ product }: ProductDetailViewProps) {
   const { addItem } = useCart();
 
   // 갤러리 이미지 세트 (images 우선, 비어 있을 경우 galleryImages fallback)
   const rawImages = product.images.length
     ? product.images.map(mediaFrom).filter((image) => Boolean(image?.url))
     : (product.galleryImages || []).map((url, index) => ({
-        id: index + 1,
-        url,
-        alt: product.name,
-      }));
+      id: index + 1,
+      url,
+      alt: product.name,
+    }));
 
   const images = rawImages.map((image, index) => ({
     id: image?.id ?? index + 1,
@@ -105,9 +114,8 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
               >
                 <Image
                   alt={currentImage.alt || product.name}
-                  className={`object-cover transition-all duration-300 group-hover:scale-[1.02] ${
-                    isSoldOut ? "opacity-60" : ""
-                  }`}
+                  className={`object-cover transition-all duration-300 group-hover:scale-[1.02] ${isSoldOut ? "opacity-60" : ""
+                    }`}
                   fill
                   priority
                   sizes="(max-width: 1024px) 92vw, 50vw"
@@ -176,11 +184,10 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
                 const isSelected = safeImageIndex === index;
                 return (
                   <button
-                    className={`relative aspect-square overflow-hidden rounded-md bg-zinc-100 transition ${
-                      isSelected
+                    className={`relative aspect-square overflow-hidden rounded-md bg-zinc-100 transition ${isSelected
                         ? "ring-2 ring-zinc-950 ring-offset-2"
                         : "opacity-70 hover:opacity-100"
-                    }`}
+                      }`}
                     key={image.id || index}
                     onClick={() => setSelectedImageIndex(index)}
                     type="button"
@@ -244,11 +251,10 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
             </div>
 
             <button
-              className={`h-14 flex-1 rounded-md px-6 text-sm font-semibold tracking-wide transition ${
-                isSoldOut
+              className={`h-14 flex-1 rounded-md px-6 text-sm font-semibold tracking-wide transition ${isSoldOut
                   ? "cursor-not-allowed bg-zinc-200 text-zinc-400"
                   : "bg-zinc-950 text-white hover:bg-zinc-800 active:scale-[0.99]"
-              }`}
+                }`}
               disabled={isSoldOut}
               onClick={handleAddToCart}
               type="button"

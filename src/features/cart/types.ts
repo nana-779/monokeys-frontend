@@ -1,4 +1,5 @@
 export type CartItem = {
+  cartItemId?: number
   productId: string
   slug: string
   name: string
@@ -11,4 +12,5 @@ export type CartItem = {
   manualBuildId?: number
   autoBuildId?: number
   buildType?: 'MANUAL' | 'AUTO'
+  customDesignData?: string
 }

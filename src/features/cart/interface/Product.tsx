@@ -1,4 +1,5 @@
 export interface ProductType {
+    cartItemId? : number,       // 장바구니 행 고유 ID (커스텀 디자인 구분용)
     productId : number,         // Id
     name : string,              // 이름
     price : number,             // 기본 단가
@@ -10,6 +11,7 @@ export interface ProductType {
     customBuildId : number,     // 커스텀 키보드 세트 ID
     buildName : string,         // 완제품 이름
     includeAssembly : boolean   // 조립 대행 공임비 포함 여부
+    customDesignData? : string  // 커스텀 키캡 디자인 JSON
 }
 
 export interface ProductList {

@@ -217,18 +217,10 @@ function NotThingItem({message, describe} : {message : string, describe : string
     )
 }
 
-function AddListItem() {
-    const {products} = useContext(ProductCartContext);
-    return (
-        <>
-            {products.map((product : ProductType) => <ListItem key={product.productId} product={product} />)}
-        </>
-    )
-}
-
 function ListItem({ product } : ProductList) {
-    const {handleUpdateCount, handleRemoveProduct} = useContext(ProductCartContext);
-
+    const { handleUpdateCount, handleRemoveProduct } = useContext(ProductCartContext);
+    const targetId = product.cartItemId ?? product.manualBuildId ?? product.productId;
+    const isMaxStock = product.quantity >= product.stockQuantity;
     return (
         <ul id="In-Item">
             {product.thumbnailUrl ? (
@@ -241,9 +233,7 @@ function ListItem({ product } : ProductList) {
             <div id="Cart-Item-Distance">
                 <div id="Cart-Item-Main">
                     <p id="Cart-Item-Name">{product.name}</p>
-                    <button id="Cart-Item-Remove-Button" type="button" tabIndex={-1} onClick={() => {
-                        handleRemoveProduct(product.cartItemId ?? product.manualBuildId ?? product.productId, product)
-                    }}>
+                    <button id="Cart-Item-Remove-Button" type="button" tabIndex={-1} onClick={() => handleRemoveProduct(targetId)}>
                         <svg id="Cart-Item-Remove_Icon" width="18" height="20" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M16 5L15.1327 17.1425C15.0579 18.1891 14.187 19 13.1378 19H4.86224C3.81296 19 2.94208 18.1891 2.86732 17.1425L2 5M16 5H12M16 5H17M2 5H1M2 5H6M7 9V15M11 9V15M12 5V2C12 1.44772 11.5523 1 11 1H7C6.44772 1 6 1.44772 6 2V5M12 5H6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="#000000"/>
                         </svg>
@@ -254,9 +244,7 @@ function ListItem({ product } : ProductList) {
                         <button id="Cart-Count-Minus"
                                 className={`${product.quantity > 1 ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
-                                onClick={() => {
-                            handleUpdateCount(product.cartItemId ?? product.manualBuildId ?? product.productId, product.quantity - 1);
-                        }}>
+                                onClick={() => handleUpdateCount(targetId, product.quantity - 1)}>
                             <svg width="10" height="1" viewBox="0 0 10 1" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 0.5H9.33333" stroke="currentColor"/>
                             </svg>
@@ -265,11 +253,10 @@ function ListItem({ product } : ProductList) {
                             <p id="Cart-Item-Count">{product.quantity}</p>
                         </div>
                         <button id="Cart-Count-Plus"
-                                className={`${product.quantity < product.stockQuantity ? "on" : "off"}`}
+                                className={`${!isMaxStock ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
-                                onClick={() => {
-                            handleUpdateCount(product.cartItemId ?? product.manualBuildId ?? product.productId, product.quantity + 1);
-                        }}>
+                                disabled={isMaxStock}
+                                onClick={() => handleUpdateCount(targetId, product.quantity + 1)}>
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 4.66667H4.66667M4.66667 4.66667H9.33333M4.66667 4.66667V0M4.66667 4.66667V9.33333" stroke="currentColor"/>
                             </svg>
@@ -278,6 +265,6 @@ function ListItem({ product } : ProductList) {
                     <p id="Cart-Explain">{formatPrice(product.price * product.quantity)}</p>
                 </div>
             </div>
-        </ ul>
+        </ul>
     );
 }

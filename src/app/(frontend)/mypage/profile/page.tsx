@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { getCurrentUser } from '@/features/auth/api'
+import { PasswordForm } from '@/features/user/password-form'
 import { ProfileForm } from '@/features/user/profile-form'
 import { useWithdrawalSession } from '@/features/user/withdrawal-session'
 
@@ -11,6 +12,8 @@ const cardClass = 'rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p
 /** 회원정보 수정(AUTH-006) 화면입니다. 회원정보 수정과 비밀번호 변경을 한 페이지에서 처리합니다. */
 export default function ProfilePage() {
   const session = useWithdrawalSession()
+  // 비밀번호 변경 후에는 로그아웃 상태가 되므로, 로그인 안내 대신 변경 완료 안내를 보여 줍니다.
+  const [passwordChanged, setPasswordChanged] = useState(false)
 
   return (
     <section className="mx-auto w-[min(92%,560px)] py-14 sm:py-20">
@@ -19,7 +22,15 @@ export default function ProfilePage() {
         // 다른 계정으로 바뀌거나 다시 로그인하면 입력 중이던 값이 남지 않도록 영역 전체를 새로 그립니다.
         <div key={`${session.user.id}-${session.sessionVersion}`} className="grid gap-6">
           <ProfileForm session={session} />
-          {/* 비밀번호 변경 폼 */}
+          <PasswordForm onChanged={() => {
+            setPasswordChanged(true)
+            // 화면을 로그아웃 상태로 바꾸고 로그인 창을 엽니다.
+            session.signOutAfterPasswordChange()
+          }} />
+        </div>
+      ) : passwordChanged ? (
+        <div className={cardClass}>
+          <p role="status" className="text-sm text-zinc-700">비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.</p>
         </div>
       ) : (
         <SignedOutNotice />

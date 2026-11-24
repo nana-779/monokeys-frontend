@@ -64,6 +64,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    setNavVisible(true);
     if (!pathname.startsWith("/products/")) return;
     let previous = window.scrollY;
     const onScroll = () => {

@@ -21,6 +21,10 @@ type CartContextValue = {
   setActiveTab: (tab: 'standard' | 'custom') => void;
 };
 
+function getItemSelectionKey(item: Pick<CartItem, "cartItemId" | "productId">) {
+  return item.cartItemId ? `item-${item.cartItemId}` : `prod-${item.productId}`;
+}
+
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function useCart() {
@@ -64,7 +68,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set());
 
   const selectedItems = useMemo(() => {
-    return items.filter((item) => !deselectedIds.has(item.productId));
+    return items.filter((item) => !deselectedIds.has(getItemSelectionKey(item)));
   }, [items, deselectedIds]);
 
   const addItem = useCallback(async (item: CartItem) => {
@@ -94,24 +98,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // 일반 상품을 담았으면 'standard', 커스텀 상품을 담았으면 'custom' 탭이 즉시 열림
         setActiveTab(isCustom ? 'custom' : 'standard');
         setCartOpen(true);
+        return true;
       }
+      return false;
     }
   }, [handleAddCart]);
 
   const updateQuantity = useCallback((index: number, quantity: number) => {
     const item = items[index];
     if (item && handleUpdateCount) {
-      handleUpdateCount(Number(item.productId), quantity);
+      handleUpdateCount(Number(item.productId), quantity, item.cartItemId);
     }
   }, [items, handleUpdateCount]);
 
   const toggleItemSelected = useCallback((item: CartItem) => {
+    const key = getItemSelectionKey(item);
     setDeselectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(item.productId)) {
-        next.delete(item.productId);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(item.productId);
+        next.add(key);
       }
       return next;
     });
@@ -121,7 +128,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (selected) {
       setDeselectedIds(new Set());
     } else {
-      setDeselectedIds(new Set(items.map((i) => i.productId)));
+      setDeselectedIds(new Set(items.map((i) => getItemSelectionKey(i))));
     }
   }, [items]);
 

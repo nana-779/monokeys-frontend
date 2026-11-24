@@ -15,7 +15,6 @@ export interface ProductType {
     buildName : string,         // 완제품 이름
     includeAssembly : boolean   // 조립 대행 공임비 포함 여부
     partProductIds? : number[]      // 부품 구성 (상품 id 리스트)
-
 }
 
 export interface ProductList {

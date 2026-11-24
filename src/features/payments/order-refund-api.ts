@@ -8,6 +8,17 @@ export type OrderRefundPreview = {
   status: 'PRECHECK_PASSED' | 'BLOCKED' | 'POLICY_REVIEW_REQUIRED'
   message: string
   cancellationEnabled: boolean
+  pgProvider?: string | null
+  paymentMethod?: 'CARD' | 'TRANSFER' | 'EASY_PAY' | 'VIRTUAL_ACCOUNT' | null
+  items?: Array<{ productName: string; unitPrice: number; quantity: number; thumbnailUrl: string | null }>
+}
+
+const paymentMethods = { CARD: '카드', TRANSFER: '계좌이체', EASY_PAY: '간편결제', VIRTUAL_ACCOUNT: '가상계좌' }
+
+export function formatRefundMethod(preview: OrderRefundPreview) {
+  if (!preview.paymentMethod) return '결제 수단 정보 없음'
+  const provider = preview.pgProvider === 'TOSS' ? '토스페이먼츠' : preview.pgProvider
+  return [provider, paymentMethods[preview.paymentMethod]].filter(Boolean).join(' · ')
 }
 
 export type OrderRefundHistory = {

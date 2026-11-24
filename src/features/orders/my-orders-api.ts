@@ -6,6 +6,19 @@ export type MyOrder = {
   paymentAmount: number | null
   orderStatus: 'PENDING' | 'ORDERED' | 'CANCELLED' | 'CONFIRMED'
   paymentStatus: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED' | null
+  deliveryStatus: 'PREPARING' | 'SHIPPING' | 'DELIVERED' | 'RETURNED' | null
+  items: Array<{ orderItemId: number; productName: string; unitPrice: number; quantity: number; thumbnailUrl: string | null }>
+}
+
+// 주문번호를 전달하면 본인 주문 상세 API가 로그인 회원의 소유권을 확인합니다.
+export async function readMyOrder(orderNumber: string, signal: AbortSignal): Promise<MyOrder> {
+  const response = await apiRequest<{ success: boolean; data: MyOrder | null }>(
+    '/api/orders/me/' + encodeURIComponent(orderNumber), { signal },
+  )
+  if (!response.success || response.data?.orderNumber !== orderNumber) {
+    throw new Error('주문 상세 응답을 확인할 수 없습니다.')
+  }
+  return response.data
 }
 
 export async function readMyOrders(signal: AbortSignal): Promise<MyOrder[]> {

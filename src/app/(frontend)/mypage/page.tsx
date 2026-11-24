@@ -7,7 +7,7 @@ import { useWithdrawalSession } from '@/features/user/withdrawal-session'
 
 // 메뉴용 페이지가 없는 항목은 주소를 비워 두고 같은 크기의 비활성 박스로 표시합니다.
 const accountMenus: Array<{ label: string; href?: string }> = [
-  { label: '회원 정보 수정' },
+  { label: '회원 정보 수정', href: '/mypage/profile' },
   { label: '주문 내역', href: '/mypage/orders' },
   { label: '배송 조회' },
   { label: '위시리스트' },

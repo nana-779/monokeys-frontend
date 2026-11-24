@@ -136,7 +136,7 @@ export function MyOrderList() {
               return (
                 <li key={order.orderNumber} className="space-y-3 px-2 py-4">
                   <h2 className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-baseline gap-3 text-sm">
-                    <time className="border-r border-neutral-300 font-semibold tabular-nums" dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10).replaceAll('-', '.')}</time>
+                    <time className="border-r border-neutral-300 text-xs font-semibold tabular-nums" dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10).replaceAll('-', '.')}</time>
                     <span className="break-all">{order.orderNumber}</span>
                   </h2>
                   <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_4rem_4rem] items-center gap-x-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_7rem_4rem_4.5rem_4.5rem] md:gap-x-2">

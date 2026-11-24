@@ -30,6 +30,34 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
 
   // 장바구니 추가
   async function handleAddCart(newProduct: ProductType): Promise<boolean> {
+    const isCustomKeycap = Boolean(newProduct.customDesignData?.trim());
+  // [커스텀 키캡 분기 처리]
+  if (isCustomKeycap) {
+    // 1. 현재 장바구니에 담긴 동일 키캡 상품의 총 수량 확인
+    const existingTotalQty = products
+      .filter((p) => p.productId === newProduct.productId)
+      .reduce((sum, p) => sum + p.quantity, 0);
+    const maxAllowed = Math.max(0, newProduct.stockQuantity - existingTotalQty);
+    let finalQuantity = newProduct.quantity;
+    if (finalQuantity > maxAllowed) {
+      alert(`${newProduct.name}의 남은 재고수는 ${maxAllowed}개입니다.`);
+      finalQuantity = maxAllowed;
+      if (finalQuantity <= 0) return false;
+    }
+    // 2. 백엔드로 customDesignData를 함께 실어서 등록 요청
+    const success = await addCartItemApi(
+      { 
+        productId: newProduct.productId, 
+        customDesignData: newProduct.customDesignData 
+      },
+      finalQuantity
+    );
+    if (success) {
+      await refreshCart(); // 장바구니 목록 최신화
+      return true;         // 장바구니 서랍 오픈
+    }
+    return false;
+  }
     const isCustom = Boolean(
       newProduct.manualBuildId || newProduct.autoBuildId ||
       newProduct.buildType === 'MANUAL' || newProduct.buildType === 'AUTO'

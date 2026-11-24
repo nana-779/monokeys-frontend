@@ -9,7 +9,7 @@ import type { ProductType } from "./interface/Product";
 type CartContextValue = {
   items: CartItem[];
   selectedItems: CartItem[];
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem) => Promise<boolean | void>;
   updateQuantity: (index: number, quantity: number) => void;
   toggleItemSelected: (item: CartItem) => void;
   selectAllItems: (selected: boolean) => void;
@@ -44,7 +44,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const items = useMemo<CartItem[]>(() => {
     return products.map((p) => {
-      const isCustom = Boolean(p.manualBuildId || p.autoBuildId || p.buildType || p.partType === 'CUSTOM');
+      const isCustom = Boolean(
+        p.manualBuildId || p.autoBuildId || p.buildType || p.partType === 'CUSTOM' || p.customDesignData
+      );
       return {
         // 일반 상품은 실제 product 테이블의 productId를 전달하여 결제/주문 검증 통과
         // 커스텀 상품은 cartItemId 또는 manualBuildId를 전달
@@ -75,7 +77,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (handleAddCart) {
       const manualBuildId = item.manualBuildId;
       const autoBuildId = item.autoBuildId;
-      const isCustom = Boolean(manualBuildId || autoBuildId || item.buildType);
+      const isCustom = Boolean(
+        manualBuildId || autoBuildId || item.buildType || item.customDesignData
+      );
+
       const effectiveProductId = Number(item.productId) || (manualBuildId ? -manualBuildId : (autoBuildId ? -autoBuildId : 0));
 
       const isSuccess = await handleAddCart({
@@ -93,6 +98,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         buildType: item.buildType,
         buildName: item.name || item.optionLabel || '',
         includeAssembly: item.optionLabel?.includes('조립 대행') ?? false,
+        customDesignData: item.customDesignData,
       });
       if (isSuccess !== false) {
         // 일반 상품을 담았으면 'standard', 커스텀 상품을 담았으면 'custom' 탭이 즉시 열림

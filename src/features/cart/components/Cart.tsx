@@ -32,7 +32,8 @@ export function Cart({ open, onClose } : CartProps) {
             p.partType === 'CUSTOM' ||
             p.manualBuildId ||
             p.autoBuildId ||
-            p.buildType
+            p.buildType ||
+            p.customDesignData 
         );
 
     const standardProducts = products.filter((p : ProductType) => !isCustomProduct(p));
@@ -43,7 +44,7 @@ export function Cart({ open, onClose } : CartProps) {
     }, 0);
 
     const customItemCount = customProducts.reduce((count: number, product: ProductType) => {
-        return count + product.quantity;
+        return count + 1;
     }, 0);
 
     const totalCost = products.reduce((sum : number, product : ProductType) => {

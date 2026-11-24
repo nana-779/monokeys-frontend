@@ -10,9 +10,17 @@ export type MyOrder = {
   items: Array<{ orderItemId: number; productName: string; unitPrice: number; quantity: number; thumbnailUrl: string | null }>
 }
 
+export type MyOrderDetail = MyOrder & {
+  ordererName: string
+  ordererPhone: string
+  postalCode: string
+  roadAddress: string
+  detailAddress: string
+}
+
 // 주문번호를 전달하면 본인 주문 상세 API가 로그인 회원의 소유권을 확인합니다.
-export async function readMyOrder(orderNumber: string, signal: AbortSignal): Promise<MyOrder> {
-  const response = await apiRequest<{ success: boolean; data: MyOrder | null }>(
+export async function readMyOrder(orderNumber: string, signal: AbortSignal): Promise<MyOrderDetail> {
+  const response = await apiRequest<{ success: boolean; data: MyOrderDetail | null }>(
     '/api/orders/me/' + encodeURIComponent(orderNumber), { signal },
   )
   if (!response.success || response.data?.orderNumber !== orderNumber) {
@@ -28,4 +36,8 @@ export async function readMyOrders(signal: AbortSignal): Promise<MyOrder[]> {
     throw new Error('주문 목록 응답을 확인할 수 없습니다.')
   }
   return response.data
+}
+
+export async function confirmMyDelivery(orderNumber: string) {
+  await apiRequest('/api/orders/me/' + encodeURIComponent(orderNumber) + '/receipt', { method: 'POST' })
 }

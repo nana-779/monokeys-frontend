@@ -130,31 +130,36 @@ export function MyOrderList() {
             {visibleOrders.map((order) => {
               const action = order.orderStatus === 'CANCELLED' || order.paymentStatus === 'CANCELLED'
                 ? 'history'
-                : refundActions[order.orderNumber]
+                : order.orderStatus === 'ORDERED' && order.paymentStatus === 'PAID'
+                  ? refundActions[order.orderNumber]
+                  : 'unavailable'
               return (
                 <li key={order.orderNumber} className="space-y-3 px-2 py-4">
-                  <h2 className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                    <time className="font-semibold" dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10).replaceAll('-', '.')}</time>
-                    <span className="break-all border-l border-neutral-300 pl-3">{order.orderNumber}</span>
+                  <h2 className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-baseline gap-3 text-sm">
+                    <time className="border-r border-neutral-300 text-xs font-semibold tabular-nums" dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10).replaceAll('-', '.')}</time>
+                    <span className="break-all">{order.orderNumber}</span>
                   </h2>
-                  <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center md:gap-8">
-                    <div>
-                      <OrderItems items={order.items} />
-                      {order.paymentAmount !== null && (
-                        <p className="mt-2 text-xs text-neutral-600">결제 금액 {formatPrice(order.paymentAmount)}</p>
-                      )}
+                  <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_4rem_4rem] items-center gap-x-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_7rem_4rem_4.5rem_4.5rem] md:gap-x-2">
+                    <div className="col-span-4 min-w-0 md:col-span-1">
+                      <OrderItems items={order.items} alignedWithOrderNumber />
                     </div>
-                    <OrderStatus order={order} />
-                    <div className="flex flex-wrap gap-2 md:justify-end">
+                    <div className="text-center text-xs text-neutral-600">
+                      <p>총 결제금액</p>
+                      <p className="font-semibold tabular-nums">{order.paymentAmount === null ? '—' : formatPrice(order.paymentAmount)}</p>
+                    </div>
+                    <div className="text-center"><OrderStatus order={order} /></div>
                       <Link href={`/mypage/orders/${encodeURIComponent(order.orderNumber)}`} prefetch={false}
-                        className="rounded-md border border-neutral-300 px-3 py-2 text-xs font-semibold">
+                        className="justify-self-center rounded-md border border-neutral-300 px-2 py-2 text-center text-xs font-semibold">
                         주문 상세
                       </Link>
+                    <div className="grid justify-items-center gap-1 text-center text-xs">
+                      {(action === 'unavailable' || action === 'history' || action === 'pending') && <span className="text-neutral-500">취소불가</span>}
+                      {!action && <span className="text-neutral-500">확인 중</span>}
                       {(action === 'cancel' || action === 'history' || action === 'pending') && (
                         <Link
                           href={`/checkout/refund/${encodeURIComponent(order.orderNumber)}${action === 'history' ? '?view=history' : ''}`}
                           prefetch={false}
-                          className="inline-flex rounded-md border border-neutral-300 px-3 py-2 text-xs font-semibold"
+                          className="inline-flex rounded-md border border-neutral-300 px-2 py-2 text-xs font-semibold"
                         >
                           {action === 'cancel' ? '주문 취소' : action === 'pending' ? '취소 결과 다시 확인' : '환불 내역'}
                         </Link>

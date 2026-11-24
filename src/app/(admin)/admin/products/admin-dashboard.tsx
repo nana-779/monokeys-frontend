@@ -20,7 +20,9 @@ import type { Category } from "@/features/products/types";
 
 import { ProductImage } from "@/components/common/product-image";
 
-type View = "register" | "list" | "edit";
+import AdminOrders from "@/features/admin/orders/admin-orders";
+
+type View = "register" | "list" | "edit" | "orders";
 type IconName =
   | "box"
   | "plus"
@@ -1918,6 +1920,7 @@ export default function AdminDashboard({
               label: "상품 목록",
               icon: "list" as IconName,
             },
+            { id: "orders" as View, label: "주문/배송 관리", icon: "box" as IconName },
           ].map((item) => {
             const active =
               view === item.id || (view === "edit" && item.id === "list");
@@ -1972,7 +1975,7 @@ export default function AdminDashboard({
             <div className="hidden items-center gap-2 text-xs text-zinc-400 sm:flex">
               <span>관리자</span>
               <Icon name="chevron" size={13} />
-              <span className="font-medium text-zinc-600">상품</span>
+              <span className="font-medium text-zinc-600">{view === "orders" ? "주문/배송 관리" : "상품"}</span>
               {view === "edit" && (
                 <>
                   <Icon name="chevron" size={13} />
@@ -1999,9 +2002,9 @@ export default function AdminDashboard({
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold tracking-[-0.035em] text-zinc-950">
-                {pageTitle}
+                {view === "orders" ? "주문/배송 관리" : pageTitle}
               </h1>
-              <p className="mt-1.5 text-sm text-zinc-500">{pageDescription}</p>
+              <p className="mt-1.5 text-sm text-zinc-500">{view === "orders" ? "주문 내역을 확인하고 배송 준비 중인 주문에 송장을 등록하세요." : pageDescription}</p>
             </div>
             {view === "list" && (
               <button
@@ -2014,7 +2017,7 @@ export default function AdminDashboard({
             )}
           </div>
 
-          {categoryError ? (
+          {view !== "orders" && (categoryError ? (
             <p role="alert" className="mb-4 text-sm text-red-700">
               {categoryError}{" "}
               <button
@@ -2032,9 +2035,9 @@ export default function AdminDashboard({
             <p role="status" className="mb-4 text-sm text-zinc-500">
               카테고리를 불러오는 중입니다.
             </p>
-          )}
+          ))}
 
-          {view === "list" ? (
+          {view === "orders" ? <AdminOrders /> : view === "list" ? (
             <ProductList
               categories={categories}
               products={products}

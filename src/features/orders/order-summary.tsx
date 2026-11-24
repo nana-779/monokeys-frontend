@@ -2,13 +2,6 @@ import { ProductImage } from '@/components/common/product-image'
 import { formatPrice } from '@/lib/store-shared'
 import type { MyOrder } from './my-orders-api'
 
-const orderLabels: Record<MyOrder['orderStatus'], string> = {
-  PENDING: '주문 대기',
-  ORDERED: '주문 완료',
-  CANCELLED: '주문 취소',
-  CONFIRMED: '구매 확정',
-}
-
 const deliveryLabels: Record<NonNullable<MyOrder['deliveryStatus']>, string> = {
   PREPARING: '배송 준비',
   SHIPPING: '배송 중',
@@ -17,22 +10,17 @@ const deliveryLabels: Record<NonNullable<MyOrder['deliveryStatus']>, string> = {
 }
 
 export function OrderStatus({ order }: { order: MyOrder }) {
-  return (
-    <div className="space-y-1 text-sm">
-      <p className="font-semibold">{orderLabels[order.orderStatus]}</p>
-      <p className="text-neutral-600">{order.deliveryStatus ? deliveryLabels[order.deliveryStatus] : '배송 정보 없음'}</p>
-    </div>
-  )
+  return <p className="text-sm text-neutral-600">{order.deliveryStatus ? deliveryLabels[order.deliveryStatus] : '배송 정보 없음'}</p>
 }
 
 // 목록과 상세에서 주문 당시 상품명·단가·수량을 같은 형식으로 표시합니다.
-export function OrderItems({ items }: { items: MyOrder['items'] }) {
+export function OrderItems({ items, alignedWithOrderNumber = false }: { items: MyOrder['items']; alignedWithOrderNumber?: boolean }) {
   if (!items?.length) return <p className="text-sm text-neutral-600">상품 정보 없음</p>
 
   return (
     <ul className="space-y-3">
       {items.map((item) => (
-        <li key={item.orderItemId} className="flex min-w-0 items-center gap-3">
+        <li key={item.orderItemId} className={`flex min-w-0 items-center ${alignedWithOrderNumber ? 'gap-8' : 'gap-3'}`}>
           <ProductImage src={item.thumbnailUrl} alt={item.productName} className="size-16 shrink-0 rounded-sm object-cover" />
           <div className="min-w-0 break-words">
             <p className="text-sm font-semibold">{item.productName}</p>

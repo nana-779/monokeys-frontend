@@ -3,13 +3,13 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { readMyOrder, type MyOrder } from '@/features/orders/my-orders-api'
+import { confirmMyDelivery, readMyOrder, type MyOrderDetail } from '@/features/orders/my-orders-api'
 import { OrderItems, OrderStatus } from '@/features/orders/order-summary'
 import { useWithdrawalSession } from '@/features/user/withdrawal-session'
 import { ApiRequestError } from '@/lib/api-client'
 import { formatPrice } from '@/lib/store-shared'
 
-type Detail = { status: 'loading' | 'login' | 'missing' | 'error' } | { status: 'ready'; order: MyOrder }
+type Detail = { status: 'loading' | 'login' | 'missing' | 'error' } | { status: 'ready'; order: MyOrderDetail }
 
 export default function OrderDetailPage() {
   const { orderNumber } = useParams<{ orderNumber: string }>()
@@ -36,6 +36,8 @@ function LoginLink() {
 // 상세 URL로 직접 들어와도 본인 주문 API에서 데이터를 다시 확인합니다.
 function OrderDetail({ orderNumber }: { orderNumber: string }) {
   const [detail, setDetail] = useState<Detail>({ status: 'loading' })
+  const [confirming, setConfirming] = useState(false)
+  const [receiptError, setReceiptError] = useState('')
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -52,6 +54,20 @@ function OrderDetail({ orderNumber }: { orderNumber: string }) {
       })
     return () => controller.abort()
   }, [orderNumber, attempt])
+
+  async function confirmReceipt(order: MyOrderDetail) {
+    setConfirming(true)
+    setReceiptError('')
+    try {
+      await confirmMyDelivery(orderNumber)
+      setDetail({ status: 'ready', order: { ...order, deliveryStatus: 'DELIVERED' } })
+    } catch (error) {
+      setReceiptError(error instanceof Error ? error.message : '수령 확인을 저장하지 못했습니다.')
+      setAttempt(value => value + 1)
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   switch (detail.status) {
     case 'loading': return <p role="status" className="text-sm">주문 정보를 불러오는 중입니다.</p>
@@ -74,8 +90,17 @@ function OrderDetail({ orderNumber }: { orderNumber: string }) {
             <dt>주문번호</dt><dd className="break-all font-semibold">{order.orderNumber}</dd>
             <dt>주문일</dt><dd><time dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10)}</time></dd>
             <dt>결제 금액</dt><dd>{order.paymentAmount === null ? '결제 정보 없음' : formatPrice(order.paymentAmount)}</dd>
-            <dt>주문·배송 상태</dt><dd><OrderStatus order={order} /></dd>
+            <dt>주문자</dt><dd>{order.ordererName || '—'}</dd>
+            <dt>연락처</dt><dd>{order.ordererPhone || '—'}</dd>
+            <dt>배송지</dt><dd className="min-w-0 break-words">
+              {[order.postalCode && `(${order.postalCode})`, order.roadAddress, order.detailAddress].filter(Boolean).join(' ') || '—'}
+            </dd>
+            <dt>배송 상태</dt><dd><OrderStatus order={order} /></dd>
           </dl>
+          {order.deliveryStatus === 'SHIPPING' && ['ORDERED', 'CONFIRMED'].includes(order.orderStatus) && (
+            <button className="rounded-md border px-4 py-2 text-sm" disabled={confirming} onClick={() => confirmReceipt(order)}>수령 확인</button>
+          )}
+          {receiptError && <p role="alert" className="text-sm">{receiptError}</p>}
           <div className="space-y-3 border-t border-neutral-200 pt-4">
             <h2 className="text-sm font-semibold">주문 상품</h2>
             <OrderItems items={order.items} />

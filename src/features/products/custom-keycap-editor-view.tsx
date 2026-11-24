@@ -6,11 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
   type ChangeEvent,
   type DragEvent,
   type PointerEvent,
 } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { MinusIcon, PlusIcon } from '@/components/icons'
 import { useCart } from '@/features/cart/cart-provider'
 import {
@@ -129,10 +131,30 @@ function MonochromeSlider({
 }
 
 export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps) {
+  const router = useRouter()
+  const [isPendingVariant, startVariantTransition] = useTransition()
+  const [pendingVariantId, setPendingVariantId] = useState<string | null>(null)
   const { items: cartItems, addItem } = useCart()
   const meta = useMemo(() => resolveKeycapMeta(product.name), [product.name])
   const isSoldOut = isProductSoldOut(product)
   const draftStorageKey = useMemo(() => getDraftStorageKey(product.id), [product.id])
+
+  const activePendingVariantId =
+    isPendingVariant && pendingVariantId && pendingVariantId !== String(product.id)
+      ? pendingVariantId
+      : null
+  const pendingVariantMeta = useMemo(
+    () => KEYCAP_VARIANT_LINKS.find((v) => v.id === activePendingVariantId) ?? null,
+    [activePendingVariantId],
+  )
+
+  const handleVariantSwitch = (variantId: string) => {
+    if (String(product.id) === variantId || activePendingVariantId === variantId) return
+    setPendingVariantId(variantId)
+    startVariantTransition(() => {
+      router.push(`/products/${variantId}`)
+    })
+  }
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -1230,20 +1252,46 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
               <span className="mr-3 shrink-0 text-[13px] font-bold text-[#52525B]">규격 전환</span>
               {KEYCAP_VARIANT_LINKS.map((variant) => {
                 const isCurrent = String(product.id) === variant.id
+                const isTargetLoading = activePendingVariantId === variant.id
+                const isHighlighted = isTargetLoading || (isCurrent && !activePendingVariantId)
                 return (
                   <Link
-                    className={`inline-flex h-8 items-center justify-center rounded-[4px] border px-3 text-xs transition ${
-                      isCurrent
+                    aria-busy={isTargetLoading || undefined}
+                    aria-current={isCurrent ? 'page' : undefined}
+                    className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-[4px] border px-3 text-xs transition ${
+                      isHighlighted
                         ? 'border-[#18181B] bg-[#18181B] font-bold text-white'
                         : 'border-transparent font-medium text-[#18181B] hover:bg-[#F4F4F5]'
-                    }`}
+                    } ${activePendingVariantId && !isTargetLoading ? 'opacity-60' : ''}`}
                     href={`/products/${variant.id}`}
                     key={variant.id}
+                    onClick={(e) => {
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                        return
+                      }
+                      e.preventDefault()
+                      handleVariantSwitch(variant.id)
+                    }}
                   >
+                    {isTargetLoading && (
+                      <span
+                        aria-hidden="true"
+                        className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-white/40 border-t-white"
+                      />
+                    )}
                     {variant.label}
                   </Link>
                 )
               })}
+              {pendingVariantMeta && (
+                <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-[#52525B]">
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-[#D4D4D8] border-t-[#18181B]"
+                  />
+                  {pendingVariantMeta.label} 불러오는 중...
+                </span>
+              )}
             </div>
 
             {/* 임시저장 복구 배너 */}
@@ -1387,7 +1435,7 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
             <div className="mt-5 grid grid-cols-[minmax(0,1fr)_288px] gap-6 max-lg:grid-cols-[minmax(0,1fr)_260px] max-md:grid-cols-1">
               <div className="md:border-r md:border-[#E4E4E7] md:pr-6">
                 <div
-                  className={`flex min-h-[420px] items-center justify-center rounded-[4px] p-6 transition max-sm:min-h-[320px] max-sm:p-4 ${
+                  className={`relative flex min-h-[420px] items-center justify-center rounded-[4px] p-6 transition max-sm:min-h-[320px] max-sm:p-4 ${
                     isDraggingFile
                       ? 'bg-zinc-200/80 ring-2 ring-dashed ring-[#18181B]'
                       : 'bg-[#F3F3F4]'
@@ -1407,6 +1455,20 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
                     style={{ cursor: canvasCursor }}
                     width={meta.canvasWidth}
                   />
+                  {pendingVariantMeta && (
+                    <div
+                      aria-live="polite"
+                      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2.5 rounded-[4px] bg-white/75 backdrop-blur-[1px]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-6 w-6 animate-spin rounded-full border-2 border-[#D4D4D8] border-t-[#18181B]"
+                      />
+                      <span className="rounded-[4px] bg-[#18181B] px-3 py-1 text-xs font-semibold text-white">
+                        {pendingVariantMeta.label} 규격으로 전환 중...
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#52525B]">
                   <div className="flex flex-wrap items-center gap-4">

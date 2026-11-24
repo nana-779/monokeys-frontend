@@ -95,6 +95,7 @@ const SORT_OPTIONS = [
   { value: 'price_asc', label: '낮은 가격순' },
   { value: 'price_desc', label: '높은 가격순' },
   { value: 'latest', label: '최신 등록순' },
+  { value: 'name_asc', label: '이름순' },
 ] as const
 
 export function ProductGrid() {
@@ -339,11 +340,10 @@ export function ProductGrid() {
           <div className="flex items-center gap-1">
             {Array.from({ length: totalPages }).map((_, idx) => (
               <button
-                className={`h-8 w-8 rounded text-xs font-medium transition ${
-                  currentPage === idx
+                className={`h-8 w-8 rounded text-xs font-medium transition ${currentPage === idx
                     ? 'bg-zinc-950 text-white'
                     : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
-                }`}
+                  }`}
                 disabled={loading || isPending}
                 key={idx}
                 onClick={() => handlePageChange(idx)}

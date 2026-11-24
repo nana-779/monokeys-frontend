@@ -15,7 +15,8 @@ export type ApiUser = {
 
 // 백엔드 응답 형식(팀 ApiResponse): { success, message, data: { user: { id, email, role } } }
 // role은 대문자(USER / ADMIN)
-type ServerUser = {
+// 회원정보 수정 응답도 같은 형식이라 회원 API(features/user/api.ts)에서 함께 사용합니다.
+export type ServerUser = {
   id: number
   email: string
   role: string
@@ -29,7 +30,7 @@ type ServerUser = {
 type ServerUserResponse = { success: boolean; message: string | null; data: { user: ServerUser } }
 
 // 백엔드 role(대문자)을 팀 프론트 형식(소문자)으로 변환
-function toApiUser(user: ServerUser): ApiUser {
+export function toApiUser(user: ServerUser): ApiUser {
   return {
     id: user.id,
     email: user.email,

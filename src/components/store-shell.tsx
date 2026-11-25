@@ -187,6 +187,19 @@ export function StoreShell({ children }: { children: ReactNode }) {
             closeCart();
             clearCart();
           },
+          updateUser: (user) => {
+            setAuthUser(user);
+          },
+          signOutAfterPasswordChange: () => {
+            setAuthUser(null);
+            setSessionVersion(v => v + 1);
+            // 로그아웃과 같이 화면의 장바구니만 비웁니다. (clearCart는 서버 장바구니까지 삭제)
+            setProducts([]);
+            closeCart();
+            setAuthError("");
+            setAuthMode("login");
+            setAuthOpen(true);
+          },
         } : null}>
           {children}
         </WithdrawalSessionContext.Provider>

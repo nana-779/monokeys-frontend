@@ -1,5 +1,5 @@
 export interface ProductType {
-    cartItemId? : number,       // 장바구니 행 고유 ID (커스텀 디자인 구분용)
+    cartItemId? : number,        // cart_item 테이블 PK
     productId : number,         // Id
     name : string,              // 이름
     price : number,             // 기본 단가
@@ -8,10 +8,14 @@ export interface ProductType {
     thumbnailUrl : string | undefined,      // 이미지 주소
     partType : string,          // 카테고리 분류
     additionalPrice : number,   // 옵션 추가 금액
-    customBuildId : number,     // 커스텀 키보드 세트 ID
+    customBuildId : number,     // 커스텀 빌드 외래키 (manual_build_id 또는 auto_build_id)
+    manualBuildId? : number,    // manual_build 테이블 외래키
+    autoBuildId? : number,      // auto_build 테이블 외래키
+    buildType? : string,        // "MANUAL" | "AUTO"
     buildName : string,         // 완제품 이름
     includeAssembly : boolean   // 조립 대행 공임비 포함 여부
-    customDesignData? : string  // 커스텀 키캡 디자인 JSON
+    partProductIds? : number[]      // 부품 구성 (상품 id 리스트)
+    customDesignData? : string   // 커스텀 키캡 정보
 }
 
 export interface ProductList {

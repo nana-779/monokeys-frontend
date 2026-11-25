@@ -9,14 +9,16 @@ import type { ProductType } from "./interface/Product";
 type CartContextValue = {
   items: CartItem[];
   selectedItems: CartItem[];
-  addItem: (item: CartItem) => Promise<boolean>;
+  addItem: (item: CartItem) => Promise<boolean | void>;
   updateQuantity: (index: number, quantity: number) => void;
   toggleItemSelected: (item: CartItem) => void;
   selectAllItems: (selected: boolean) => void;
   clearSelectedItems: () => void;
   clearCart: () => void;
-  openCart: () => void;
+  openCart: (tab?: 'standard' | 'custom') => void;
   closeCart: () => void;
+  activeTab: 'standard' | 'custom';
+  setActiveTab: (tab: 'standard' | 'custom') => void;
 };
 
 function getItemSelectionKey(item: Pick<CartItem, "cartItemId" | "productId">) {
@@ -33,30 +35,36 @@ export function useCart() {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartOpen, setCartOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'standard' | 'custom'>('standard');
   const cartCtx = useContext(ProductCartContext);
   const products: ProductType[] = cartCtx?.products || [];
   const handleUpdateCount = cartCtx?.handleUpdateCount;
   const handleClearCart = cartCtx?.handleClearCart;
-  const handleAddProduct = cartCtx?.handleAddProduct;
+  const handleAddCart = cartCtx?.handleAddCart;
 
   const items = useMemo<CartItem[]>(() => {
-    return products.map((p) => ({
-      cartItemId: p.cartItemId,
-      productId: String(p.productId),
-      slug: String(p.productId),
-      name: p.name,
-      image: p.thumbnailUrl,
-      optionValue: p.cartItemId
-        ? `item-${p.cartItemId}`
-        : p.customBuildId
-          ? `custom-${p.customBuildId}`
-          : undefined,
-      optionLabel: p.buildName || (p.includeAssembly ? '조립 대행 포함' : undefined),
-      unitPrice: p.price,
-      shippingFee: 0,
-      quantity: p.quantity,
-      customDesignData: p.customDesignData,
-    }));
+    return products.map((p) => {
+      const isCustom = Boolean(
+        p.manualBuildId || p.autoBuildId || p.buildType || p.partType === 'CUSTOM' || p.customDesignData
+      );
+      return {
+        // 일반 상품은 실제 product 테이블의 productId를 전달하여 결제/주문 검증 통과
+        // 커스텀 상품은 cartItemId 또는 manualBuildId를 전달
+        productId: String(isCustom ? (p.cartItemId ?? p.manualBuildId ?? p.productId) : p.productId),
+        cartItemId: p.cartItemId,
+        slug: String(p.productId),
+        name: p.name,
+        image: p.thumbnailUrl,
+        optionValue: p.customBuildId ? `custom-${p.customBuildId}` : undefined,
+        optionLabel: p.buildName || (p.includeAssembly ? '조립 대행 포함' : undefined),
+        unitPrice: p.price,
+        shippingFee: 0,
+        quantity: p.quantity,
+        buildType: p.buildType as 'MANUAL' | 'AUTO' | undefined,
+        manualBuildId: p.manualBuildId,
+        autoBuildId: p.autoBuildId,
+      };
+    });
   }, [products]);
 
   const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set());
@@ -65,30 +73,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return items.filter((item) => !deselectedIds.has(getItemSelectionKey(item)));
   }, [items, deselectedIds]);
 
-  const addItem = useCallback(async (item: CartItem): Promise<boolean> => {
-    if (handleAddProduct) {
-      const isSuccess = await handleAddProduct({
-        productId: Number(item.productId),
+  const addItem = useCallback(async (item: CartItem) => {
+    if (handleAddCart) {
+      const manualBuildId = item.manualBuildId;
+      const autoBuildId = item.autoBuildId;
+      const isCustom = Boolean(
+        manualBuildId || autoBuildId || item.buildType || item.customDesignData
+      );
+
+      const effectiveProductId = Number(item.productId) || (manualBuildId ? -manualBuildId : (autoBuildId ? -autoBuildId : 0));
+
+      const isSuccess = await handleAddCart({
+        productId: effectiveProductId,
         name: item.name,
         price: item.unitPrice,
         stockQuantity: 999,
         quantity: item.quantity,
         thumbnailUrl: item.image,
-        partType: '',
+        partType: isCustom ? 'CUSTOM' : '',
         additionalPrice: 0,
-        customBuildId: 0,
-        buildName: item.optionLabel || '',
-        includeAssembly: false,
+        customBuildId: manualBuildId || autoBuildId || 0,
+        manualBuildId,
+        autoBuildId,
+        buildType: item.buildType,
+        buildName: item.name || item.optionLabel || '',
+        includeAssembly: item.optionLabel?.includes('조립 대행') ?? false,
         customDesignData: item.customDesignData,
       });
       if (isSuccess !== false) {
+        // 일반 상품을 담았으면 'standard', 커스텀 상품을 담았으면 'custom' 탭이 즉시 열림
+        setActiveTab(isCustom ? 'custom' : 'standard');
         setCartOpen(true);
         return true;
       }
       return false;
     }
-    return false;
-  }, [handleAddProduct]);
+  }, [handleAddCart]);
 
   const updateQuantity = useCallback((index: number, quantity: number) => {
     const item = items[index];
@@ -132,7 +152,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setDeselectedIds(new Set());
   }, [handleClearCart]);
 
-  const openCart = useCallback(() => setCartOpen(true), []);
+  const openCart = useCallback((tab?: 'standard' | 'custom') => {
+    if (tab) {
+      setActiveTab(tab);
+    }
+    setCartOpen(true);
+   }, []);
+
   const closeCart = useCallback(() => setCartOpen(false), []);
 
   const value = useMemo<CartContextValue>(() => ({
@@ -146,7 +172,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     clearCart,
     openCart,
     closeCart,
-  }), [addItem, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity]);
+    activeTab,
+    setActiveTab
+  }), [addItem, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity, activeTab]);
 
   return (
     <CartContext.Provider value={value}>

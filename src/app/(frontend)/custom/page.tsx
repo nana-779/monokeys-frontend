@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -16,6 +16,7 @@ import {
 } from '@/features/products/builds-api'
 import type { Product } from '@/features/products/types'
 import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
+import { ProductCartContext } from '@/features/cart/components/CartContext'
 import { ApiRequestError, apiRequest } from '@/lib/api-client'
 
 function mapBuildItemToProduct(item: BuildItemResponse, catalog: Product[]): Product {
@@ -124,6 +125,8 @@ export default function CustomBuilderPage() {
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([])
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
+
+  const { products } = useContext(ProductCartContext)
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -301,6 +304,33 @@ export default function CustomBuilderPage() {
   // 장바구니 담기 핸들러 (백엔드 /api/builds 저장 후 장바구니 전달)
   const handleAddBuildToCart = async (build: BuildData) => {
     if (savingBuild) return
+
+    // 1. 현재 화면에서 고른 부품 4개의 ID 정렬 목록
+    const currentPartIds = [
+      build.housing.productId,
+      build.pcb.productId,
+      build.switchPart.productId,
+      build.keycap.productId,
+    ].sort((a, b) => a - b)
+    // 2. 이미 장바구니에 똑같은 부품 4개 + 똑같은 조립 옵션이 있는지 검사
+    const isAlreadyInCart = products.some((p) => {
+      if (!p.partProductIds || p.partProductIds.length !== 4) return false
+      const existingSorted = [...p.partProductIds].sort((a, b) => a - b)
+      
+      const isSameParts = existingSorted.every((id, idx) => id === currentPartIds[idx])
+      const isSameAssembly = Boolean(p.includeAssembly) === Boolean(includeAssembly)
+      return isSameParts && isSameAssembly
+    })
+    // 3. 이미 같은 조합이 존재할 경우 사용자에게 질문창 띄우기
+    if (isAlreadyInCart) {
+      const willAddMore = confirm(
+        '이미 장바구니에 동일한 조합의 커스텀 키보드가 담겨 있습니다.\n수량을 1개 더 추가하시겠습니까?'
+      )
+      if (!willAddMore) {
+        return // 사용자가 취소를 누르면 담기 중단
+      }
+    }
+    
     setSavingBuild(true)
 
     try {
@@ -356,15 +386,6 @@ export default function CustomBuilderPage() {
       })
 
       openCart()
-      alert(
-        `[커스텀 키보드 빌드 #${buildId} 저장 완료]\n` +
-        `- 하우징: ${build.housing.name} (${build.housing.layout || ''}%)\n` +
-        `- 기판: ${build.pcb.name}\n` +
-        `- 스위치: ${build.switchPart.name}\n` +
-        `- 키캡: ${build.keycap.name}${build.keycap.selectedOption ? ` (${build.keycap.selectedOption.optionName})` : ''}\n` +
-        `${saved.includeAssembly ? `+ 조립 대행 공임비 (${formatPrice(saved.assemblyFee)})\n` : ''}\n` +
-        `서버 확정 총액 ${formatPrice(saved.totalPrice)}이 장바구니에 담겼습니다.`,
-      )
     } catch (err) {
       alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')
     } finally {

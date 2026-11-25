@@ -11,10 +11,14 @@ import {
   removeCartItemApi,
 } from "../api";
 
+// cartItemId 우선, 없으면 productId로 대상 식별
+const isTargetItem = (p: ProductType, id: number) =>
+  p.cartItemId ? p.cartItemId === id : p.productId === id;
+
 export function ProductCartProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<ProductType[]>([]);
 
-  // 1. 마운트 시 백엔드 DB에서 현재 로그인한 유저의 장바구니 목록 조회 (순수 쿠키 인증)
+  // 장바구니 목록 조회
   const refreshCart = useCallback(async () => {
     const list = await getCartApi();
     setProducts(list);
@@ -24,135 +28,98 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
     refreshCart();
   }, [refreshCart]);
 
-  // 2. 장바구니 상품 추가 (백엔드 쿠키 인증 결과에 따라 처리)
-  async function handleAddProduct(newProduct: ProductType): Promise<boolean> {
+  // 장바구니 추가
+  async function handleAddCart(newProduct: ProductType): Promise<boolean> {
     const isCustomKeycap = Boolean(newProduct.customDesignData?.trim());
-    const existingProduct = isCustomKeycap
-      ? undefined
-      : products.find(
-          (product) =>
-            !product.customDesignData && product.productId === newProduct.productId
-        );
-
-    // [경우 A] 이미 장바구니에 있는 일반 상품인 경우 (커스텀 디자인은 별도 행으로 분리)
-    if (existingProduct) {
-      let newQuantity = existingProduct.quantity + newProduct.quantity;
-      let finalQuantity = newQuantity;
-      
-      newQuantity = Math.max(1, newQuantity);
-
-      // 재고 초과 시 알림창 띄우고 최대 재고수로 보정
-      if (newQuantity > existingProduct.stockQuantity) {
-        alert(
-          `${existingProduct.name}의 현재 재고수는 ${existingProduct.stockQuantity}개입니다.`
-        );
-        finalQuantity = existingProduct.stockQuantity;
-      }
-
-      // 백엔드로 쿠키와 함께 수량 변경 요청
-      const success = await changeCartItem(
-        newProduct.productId,
-        finalQuantity,
-        existingProduct.cartItemId
-      );
-      if (success) {
-        setProducts((prevProducts) =>
-          prevProducts.map((product) =>
-            product.cartItemId && existingProduct.cartItemId
-              ? product.cartItemId === existingProduct.cartItemId
-                ? { ...product, quantity: finalQuantity }
-                : product
-              : !product.customDesignData && product.productId === newProduct.productId
-                ? { ...product, quantity: finalQuantity }
-                : product
-          )
-        );
-        return true; // 장바구니 서랍 오픈
-      }
-      return false;
-    }
-
-    // [경우 B] 새로 담는 상품 (또는 새 커스텀 디자인)인 경우
+  // [커스텀 키캡 분기 처리]
+  if (isCustomKeycap) {
+    // 1. 현재 장바구니에 담긴 동일 키캡 상품의 총 수량 확인
     const existingTotalQty = products
       .filter((p) => p.productId === newProduct.productId)
       .reduce((sum, p) => sum + p.quantity, 0);
-    const maxAllowedForNew = Math.max(0, newProduct.stockQuantity - existingTotalQty);
+    const maxAllowed = Math.max(0, newProduct.stockQuantity - existingTotalQty);
     let finalQuantity = newProduct.quantity;
-
-    // 재고 초과 시 알림창 띄우고 가능한 수량으로 보정
-    if (finalQuantity > maxAllowedForNew) {
-      alert(`${newProduct.name}의 현재 재고수는 ${newProduct.stockQuantity}개입니다.`);
-      finalQuantity = maxAllowedForNew;
-      if (finalQuantity <= 0) {
-        return false;
-      }
+    if (finalQuantity > maxAllowed) {
+      alert(`${newProduct.name}의 남은 재고수는 ${maxAllowed}개입니다.`);
+      finalQuantity = maxAllowed;
+      if (finalQuantity <= 0) return false;
     }
-
-    const productToAdd = { ...newProduct, quantity: finalQuantity };
-
-    // 백엔드로 쿠키와 함께 등록 요청
+    // 2. 백엔드로 customDesignData를 함께 실어서 등록 요청
     const success = await addCartItemApi(
-      productToAdd.productId,
-      finalQuantity,
-      productToAdd.customDesignData
+      { 
+        productId: newProduct.productId, 
+        customDesignData: newProduct.customDesignData 
+      },
+      finalQuantity
     );
     if (success) {
-      await refreshCart();
-      return true; // 장바구니 서랍 오픈
+      await refreshCart(); // 장바구니 목록 최신화
+      return true;         // 장바구니 서랍 오픈
+    }
+    return false;
+  }
+    const isCustom = Boolean(
+      newProduct.manualBuildId || newProduct.autoBuildId ||
+      newProduct.buildType === 'MANUAL' || newProduct.buildType === 'AUTO'
+    );
+    // 이미 장바구니에 있는 항목인지 확인
+    const existing = products.find((p) =>
+      isCustom
+        ? (newProduct.manualBuildId && p.manualBuildId === newProduct.manualBuildId) ||
+          (newProduct.autoBuildId && p.autoBuildId === newProduct.autoBuildId)
+        : p.productId === newProduct.productId
+    );
+    let quantityToAdd = newProduct.quantity;
+    const maxStock = existing ? existing.stockQuantity : newProduct.stockQuantity;
+    const currentQty = existing ? existing.quantity : 0;
+    // 담으려는 수량이 최대 재고수를 초과할 때
+    if (currentQty + quantityToAdd > maxStock) {
+      if (currentQty >= maxStock) {
+        alert("이미 최대 주문 가능 수량만큼 장바구니에 담겨 있습니다.");
+        return false;
+      }
+      alert(`${newProduct.name || '해당 상품'}의 최대 주문 가능 수량은 ${maxStock}개입니다.\n(최대 수량에 맞추어 장바구니에 담깁니다.)`);
+      quantityToAdd = Math.max(1, maxStock - currentQty);
+    }
+    const targetPayload = isCustom
+      ? { manualBuildId: newProduct.manualBuildId, autoBuildId: newProduct.autoBuildId }
+      : { productId: newProduct.productId };
+    const success = await addCartItemApi(targetPayload, quantityToAdd);
+    if (success) {
+      await refreshCart(); // 장바구니 최신화
+      return true;
     }
     return false;
   }
 
-  // 3. 장바구니 상품 수량 변경 (+ / -)
-  async function handleUpdateCount(id: number, newQuantity: number, cartItemId?: number) {
-    let finalQuantity = newQuantity;
-    const targetProduct =
-      cartItemId && cartItemId > 0
-        ? products.find((p) => p.cartItemId === cartItemId)
-        : products.find((p) => !p.customDesignData && p.productId === id) ??
-          products.find((p) => p.productId === id);
-    newQuantity = Math.max(1, newQuantity);
+  // 수량 변경 (+ / -)
+  async function handleUpdateCount(id: number, newQuantity: number) {
+    let finalQuantity = Math.max(1, newQuantity);
+    const targetProduct = products.find((p) => isTargetItem(p, id));
 
     if (targetProduct && newQuantity > targetProduct.stockQuantity) {
-      alert(`${targetProduct.name}의 현재 재고수는 ${targetProduct.stockQuantity}개입니다.`);
-      newQuantity = targetProduct.stockQuantity;
+      alert("재고수를 초과합니다.");
+      finalQuantity = targetProduct.stockQuantity;
     }
 
-    finalQuantity = newQuantity;
-
-    setProducts((prevProducts) =>
-      prevProducts.map((product) => {
-        const isTarget =
-          cartItemId && cartItemId > 0
-            ? product.cartItemId === cartItemId
-            : product.productId === id && !product.customDesignData;
-        return isTarget ? { ...product, quantity: finalQuantity } : product;
-      })
+    setProducts((prev) =>
+      prev.map((p) => (isTargetItem(p, id) ? { ...p, quantity: finalQuantity } : p))
     );
 
-    // 서버가 거부하거나 실패하면, 먼저 바꿔 둔 화면을 서버(DB) 상태로 되돌림
-    const success = await changeCartItem(id, finalQuantity, cartItemId);
-    if (!success) await refreshCart();
+    await changeCartItem(id, finalQuantity);
+    await refreshCart();
   }
 
-  // 4. 장바구니 상품 단건 삭제
-  async function handleRemoveProduct(id: number, cartItemId?: number) {
-    setProducts((prevProducts) =>
-      prevProducts.filter((product) =>
-        cartItemId && cartItemId > 0
-          ? product.cartItemId !== cartItemId
-          : product.productId !== id
-      )
-    );
-    // 서버가 거부하거나 실패하면, 먼저 바꿔 둔 화면을 서버(DB) 상태로 되돌림
-    const success = await removeCartItemApi(id, cartItemId);
-    if (!success) await refreshCart();
+  // 단건 삭제
+  async function handleRemoveProduct(id: number) {
+    setProducts((prev) => prev.filter((p) => !isTargetItem(p, id)));
+    await removeCartItemApi(id);
+    await refreshCart();
   }
 
-  // 5. 장바구니 전체 비우기
+  // 전체 비우기
   async function handleClearCart() {
     setProducts([]);
-    // 서버가 거부하거나 실패하면, 먼저 바꿔 둔 화면을 서버(DB) 상태로 되돌림
     const success = await clearCartApi();
     if (!success) await refreshCart();
   }
@@ -163,7 +130,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
         products,
         handleUpdateCount,
         handleRemoveProduct,
-        handleAddProduct,
+        handleAddCart,
         handleClearCart,
         refreshCart,
         setProducts,

@@ -17,11 +17,16 @@ const isTargetItem = (p: ProductType, id: number) =>
 
 export function ProductCartProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<ProductType[]>([]);
+  const [cartLoading, setCartLoading] = useState(true);
 
   // 장바구니 목록 조회
   const refreshCart = useCallback(async () => {
-    const list = await getCartApi();
-    setProducts(list);
+    try {
+      const list = await getCartApi();
+      setProducts(list);
+    } finally {
+      setCartLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -128,6 +133,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
     <ProductCartContext.Provider
       value={{
         products,
+        cartLoading,
         handleUpdateCount,
         handleRemoveProduct,
         handleAddCart,

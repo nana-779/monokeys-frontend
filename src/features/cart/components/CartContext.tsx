@@ -5,6 +5,7 @@ import type { ProductType } from "../interface/Product";
 
 export type ProductCartContextValue = {
   products: ProductType[];
+  cartLoading: boolean;
   handleUpdateCount: (id: number, newQuantity: number) => Promise<void>;
   handleRemoveProduct: (id: number) => Promise<void>;
   handleAddCart: (newProduct: ProductType) => Promise<boolean>;
@@ -17,6 +18,7 @@ const noopAsync = async () => {};
 
 export const ProductCartContext = createContext<ProductCartContextValue>({
   products: [],
+  cartLoading: false,
   handleUpdateCount: noopAsync,
   handleRemoveProduct: noopAsync,
   handleAddCart: async () => false,

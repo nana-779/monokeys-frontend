@@ -12,7 +12,7 @@ type CartProps = {
 };
 
 export function Cart({ open, onClose } : CartProps) {
-    const { products, refreshCart } = useContext(ProductCartContext);
+    const { products, cartLoading, refreshCart } = useContext(ProductCartContext);
     const { activeTab, setActiveTab } = useCart();
     const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
@@ -103,7 +103,7 @@ export function Cart({ open, onClose } : CartProps) {
                     }`}
                 >
                     <div id="Cart-Header">
-                        <h2 id="Cart-Header-Name">Your cart ({products.length})</h2>
+                        <h2 id="Cart-Header-Name">Your cart {cartLoading ? "" : `(${products.length})`}</h2>
                         <button id="Cart-Close-Button" type="button" onClick={onClose}>
                             <svg id="Cart-Close-Icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M5 5L10 10M10 10L15 15M10 10L15 5M10 10L15 5M10 10L5 15" strokeWidth="1.25" strokeLinecap="round" stroke="#09090B"/>
@@ -121,7 +121,7 @@ export function Cart({ open, onClose } : CartProps) {
                                     : 'font-normal text-zinc-400 hover:text-zinc-600'
                             }`}
                         >
-                            일반 상품 ({standardItemCount})
+                            일반 상품{cartLoading ? "" : ` (${standardItemCount})`}
                             {activeTab === 'standard' && (
                                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />
                             )}
@@ -135,7 +135,7 @@ export function Cart({ open, onClose } : CartProps) {
                                     : 'font-normal text-zinc-400 hover:text-zinc-600'
                             }`}
                         >
-                            커스텀 상품 ({customItemCount})
+                            커스텀 상품{cartLoading ? "" : ` (${customItemCount})`}
                             {activeTab === 'custom' && (
                                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />
                             )}
@@ -156,7 +156,9 @@ export function Cart({ open, onClose } : CartProps) {
                         >
                             {/* 1. 일반 상품 목록 */}
                             <div className="flex h-full w-1/2 flex-col items-start overflow-y-auto overflow-x-hidden py-5">
-                                {standardProducts.length === 0 ? (
+                                {cartLoading ? (
+                                    <CartSkeletonList />
+                                ) : standardProducts.length === 0 ? (
                                     <NotThingItem
                                         message="담긴 일반 상품이 없습니다."
                                         describe="원하는 상품을 장바구니에 담아보세요."
@@ -170,7 +172,9 @@ export function Cart({ open, onClose } : CartProps) {
 
                             {/* 2. 커스텀 상품 목록 */}
                             <div className="flex h-full w-1/2 flex-col items-start overflow-y-auto overflow-x-hidden py-5">
-                                {customProducts.length === 0 ? (
+                                {cartLoading ? (
+                                    <CartSkeletonList />
+                                ) : customProducts.length === 0 ? (
                                     <NotThingItem
                                         message="담긴 커스텀 상품이 없습니다."
                                         describe="CUSTOM BUILD에서 나만의 키보드를 조립해보세요."
@@ -201,6 +205,31 @@ export function Cart({ open, onClose } : CartProps) {
                     </div>
                 </aside>
             </div>
+        </div>
+    );
+}
+
+function CartSkeletonList() {
+    return (
+        <div aria-busy="true" aria-label="장바구니 상품을 불러오는 중입니다" className="w-full" role="status">
+            {[0, 1, 2].map((idx) => (
+                <div
+                    className="flex w-[90%] items-start gap-4 border-b border-zinc-100 py-5"
+                    key={idx}
+                >
+                    <div className="h-20 w-20 shrink-0 animate-pulse rounded-sm bg-zinc-200" />
+                    <div className="flex h-20 flex-1 flex-col justify-between py-0.5">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-200" />
+                            <div className="h-5 w-5 animate-pulse rounded bg-zinc-100" />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="h-7 w-20 animate-pulse rounded bg-zinc-100" />
+                            <div className="h-4 w-16 animate-pulse rounded bg-zinc-200" />
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }

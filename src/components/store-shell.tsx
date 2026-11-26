@@ -29,7 +29,7 @@ type AppUser = ApiUser;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function StoreShell({ children }: { children: ReactNode }) {
-  const { products, refreshCart, setProducts } = useContext(ProductCartContext);
+  const { products, cartLoading, refreshCart, setProducts } = useContext(ProductCartContext);
   const { openCart, closeCart, clearCart } = useCart();
 
   const pathname = usePathname();
@@ -38,6 +38,8 @@ export function StoreShell({ children }: { children: ReactNode }) {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
+  // 새로고침 직후 세션 복구(/api/auth/me)가 끝나기 전까지 헤더에 LOGIN이 깜빡이지 않게 구분한다
+  const [authChecking, setAuthChecking] = useState(true);
   // 요청 중에는 버튼·입력창을 잠가서 중복 클릭을 막는다
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -57,6 +59,9 @@ export function StoreShell({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!ignore) setAuthUser(null);
+      })
+      .finally(() => {
+        if (!ignore) setAuthChecking(false);
       });
     return () => {
       ignore = true;
@@ -89,6 +94,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
   }, [pathname, closeCart]);
 
   const openAccount = () => {
+    if (authChecking) return;
     closeCart();
     setAuthError("");
     setAuthOpen(true);
@@ -166,7 +172,9 @@ export function StoreShell({ children }: { children: ReactNode }) {
   return (
     <>
       <SiteHeader
+        authChecking={authChecking}
         cartCount={products.length}
+        cartLoading={cartLoading}
         onOpenAccount={openAccount}
         onOpenCart={() => {
           setAuthOpen(false);

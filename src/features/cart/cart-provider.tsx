@@ -9,6 +9,7 @@ import type { ProductType } from "./interface/Product";
 type CartContextValue = {
   items: CartItem[];
   selectedItems: CartItem[];
+  cartLoading: boolean;
   addItem: (item: CartItem) => Promise<boolean | void>;
   updateQuantity: (index: number, quantity: number) => void;
   toggleItemSelected: (item: CartItem) => void;
@@ -163,9 +164,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const closeCart = useCallback(() => setCartOpen(false), []);
 
+  const cartLoading = cartCtx?.cartLoading ?? false;
+
   const value = useMemo<CartContextValue>(() => ({
     items,
     selectedItems,
+    cartLoading,
     addItem,
     updateQuantity,
     toggleItemSelected,
@@ -176,7 +180,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     closeCart,
     activeTab,
     setActiveTab
-  }), [addItem, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity, activeTab]);
+  }), [addItem, cartLoading, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity, activeTab]);
 
   return (
     <CartContext.Provider value={value}>

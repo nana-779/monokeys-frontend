@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -179,33 +179,43 @@ export default function CustomBuilderPage() {
   const [recommendLoading, setRecommendLoading] = useState(false)
   const [savingBuild, setSavingBuild] = useState(false)
 
-  // ==================== 부품 목록 데이터 분리 ====================
-  const allHousings = catalogProducts.filter((p) => p.parentCategoryId === 'housing')
-  const allPcbs = catalogProducts.filter(
-    (p) => p.parentCategoryId === 'keyboards' || p.parentCategoryId === 'pcb',
-  )
-  const allSwitches = catalogProducts.filter(
-    (p) => p.parentCategoryId === 'switches' || p.parentCategoryId === 'switch',
-  )
-  const allKeycaps = catalogProducts.filter(
-    (p) =>
-      (p.parentCategoryId === 'keycaps' || p.parentCategoryId === 'keycap') &&
-      p.categoryId !== 'keycap-custom',
-  )
+  // ==================== 부품 목록 데이터 분리 (카탈로그 변경 시에만 재분류) ====================
+  const { allHousings, allPcbs, allSwitches, allKeycaps } = useMemo(() => ({
+    allHousings: catalogProducts.filter((p) => p.parentCategoryId === 'housing'),
+    allPcbs: catalogProducts.filter(
+      (p) => p.parentCategoryId === 'keyboards' || p.parentCategoryId === 'pcb',
+    ),
+    allSwitches: catalogProducts.filter(
+      (p) => p.parentCategoryId === 'switches' || p.parentCategoryId === 'switch',
+    ),
+    allKeycaps: catalogProducts.filter(
+      (p) =>
+        (p.parentCategoryId === 'keycaps' || p.parentCategoryId === 'keycap') &&
+        p.categoryId !== 'keycap-custom',
+    ),
+  }), [catalogProducts])
 
   // ==================== 수동 모드 호환 필터 ====================
   // 1. 호환 기판: 선택된 하우징의 layout과 일치
-  const compatiblePcbs = manualSelection.housing
-    ? allPcbs.filter((pcb) => pcb.layout === manualSelection.housing?.layout)
-    : allPcbs
+  const compatiblePcbs = useMemo(
+    () =>
+      manualSelection.housing
+        ? allPcbs.filter((pcb) => pcb.layout === manualSelection.housing?.layout)
+        : allPcbs,
+    [allPcbs, manualSelection.housing],
+  )
 
   // 2. 호환 스위치: 선택된 기판의 supportPins 규격 만족 (기판 없으면 전체 허용)
-  const compatibleSwitches = manualSelection.pcb
-    ? allSwitches.filter((sw) => {
-      const pins = manualSelection.pcb?.supportPins || [3, 5]
-      return sw.pin ? pins.includes(sw.pin) : true
-    })
-    : allSwitches
+  const compatibleSwitches = useMemo(
+    () =>
+      manualSelection.pcb
+        ? allSwitches.filter((sw) => {
+          const pins = manualSelection.pcb?.supportPins || [3, 5]
+          return sw.pin ? pins.includes(sw.pin) : true
+        })
+        : allSwitches,
+    [allSwitches, manualSelection.pcb],
+  )
 
   // 수동 부품 선택 및 선택 해제(토글) 핸들러
   const handleSelectPart = (category: keyof ManualSelectionState, product: Product) => {

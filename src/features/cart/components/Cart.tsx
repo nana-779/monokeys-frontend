@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import "../style.css";
 import { ProductCartContext } from "./CartContext";
 import type { ProductList, ProductType } from "../interface/Product";
@@ -11,51 +11,49 @@ type CartProps = {
   onClose: () => void;
 };
 
+const isCustomProduct = (p: ProductType) =>
+    Boolean(
+        (p.customBuildId && p.customBuildId > 0) ||
+        (p.buildName && p.buildName.trim().length > 0) ||
+        p.partType === 'CUSTOM' ||
+        p.manualBuildId ||
+        p.autoBuildId ||
+        p.buildType ||
+        p.customDesignData
+    );
+
 export function Cart({ open, onClose } : CartProps) {
-    const { products, cartLoading, refreshCart } = useContext(ProductCartContext);
+    const { products, cartLoading, refreshCartIfStale } = useContext(ProductCartContext);
     const { activeTab, setActiveTab } = useCart();
     const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
-    // 장바구니 서랍이 열릴 때(false -> true) 딱 1번만 백엔드 최신 상태 동기화 (무한 루프 방지)
+    // 장바구니 서랍이 열릴 때 마지막 동기화 후 일정 시간이 지난 경우에만 백엔드 상태를 재확인합니다.
     useEffect(() => {
-        if (open && typeof refreshCart === "function") {
-            refreshCart();
+        if (open) {
+            void refreshCartIfStale();
         }
-    }, [open]);
+    }, [open, refreshCartIfStale]);
 
     const router = useRouter();
 
-    const isCustomProduct = (p: ProductType) =>
-        Boolean(
-            (p.customBuildId && p.customBuildId > 0) ||
-            (p.buildName && p.buildName.trim().length > 0) ||
-            p.partType === 'CUSTOM' ||
-            p.manualBuildId ||
-            p.autoBuildId ||
-            p.buildType ||
-            p.customDesignData 
-        );
+    const { standardProducts, customProducts, totalCost, allItemCount } = useMemo(() => {
+        const standard: ProductType[] = [];
+        const custom: ProductType[] = [];
+        let cost = 0;
+        let count = 0;
 
-    const standardProducts = products.filter((p : ProductType) => !isCustomProduct(p));
-    const customProducts = products.filter((p : ProductType) => isCustomProduct(p));
+        for (const p of products) {
+            if (isCustomProduct(p)) custom.push(p);
+            else standard.push(p);
+            cost += p.price * p.quantity;
+            count += p.quantity;
+        }
 
-    const standardItemCount = standardProducts.reduce((count: number, product: ProductType) => {
-        return count + 1;
-    }, 0);
+        return { standardProducts: standard, customProducts: custom, totalCost: cost, allItemCount: count };
+    }, [products]);
 
-    const customItemCount = customProducts.reduce((count: number, product: ProductType) => {
-        return count + 1;
-    }, 0);
-
-    const totalCost = products.reduce((sum : number, product : ProductType) => {
-        sum += (product.price * product.quantity);
-        return sum;
-    }, 0);
-
-    const allItemCount = products.reduce((count : number, product : ProductType) => {
-        count += product.quantity
-        return count
-    }, 0)
+    const standardItemCount = standardProducts.length;
+    const customItemCount = customProducts.length;
 
     const handleTouchStart = (e: React.TouchEvent) => {
         setTouchStartX(e.touches[0].clientX);
@@ -74,7 +72,7 @@ export function Cart({ open, onClose } : CartProps) {
 
     return (
         <div 
-            id="Cart-Container"
+            id="Cart-Root"
             className={`fixed inset-0 z-[60] transition ${
             open
             ? "pointer-events-auto"

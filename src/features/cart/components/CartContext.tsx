@@ -11,6 +11,7 @@ export type ProductCartContextValue = {
   handleAddCart: (newProduct: ProductType) => Promise<boolean>;
   handleClearCart: () => Promise<void>;
   refreshCart: () => Promise<void>;
+  refreshCartIfStale: () => Promise<void>;
   setProducts: Dispatch<SetStateAction<ProductType[]>>;
 };
 
@@ -24,5 +25,6 @@ export const ProductCartContext = createContext<ProductCartContextValue>({
   handleAddCart: async () => false,
   handleClearCart: noopAsync,
   refreshCart: noopAsync,
+  refreshCartIfStale: noopAsync,
   setProducts: () => {},
 });

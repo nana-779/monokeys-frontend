@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   useContext,
   useEffect,
+  useMemo,
   useState,
   type FormEvent,
   type ReactNode,
@@ -164,9 +165,37 @@ export function StoreShell({ children }: { children: ReactNode }) {
     }
   };
 
-  const cartCount = products.reduce(
-    (total : any, product : ProductType) => total + product.quantity,
-    0
+  // 스크롤·폼 입력 등 StoreShell UI 상태 변경 시 하위 페이지 불필요 리렌더 방지
+  const withdrawalSessionValue = useMemo(
+    () =>
+      authUser
+        ? {
+            user: authUser,
+            sessionVersion,
+            clearAfterWithdrawal: () => {
+              setAuthUser(null);
+              setSessionVersion(v => v + 1);
+              setAuthOpen(false);
+              setAuthError("");
+              closeCart();
+              clearCart();
+            },
+            updateUser: (user: AppUser) => {
+              setAuthUser(user);
+            },
+            signOutAfterPasswordChange: () => {
+              setAuthUser(null);
+              setSessionVersion(v => v + 1);
+              // 로그아웃과 같이 화면의 장바구니만 비웁니다. (clearCart는 서버 장바구니까지 삭제)
+              setProducts([]);
+              closeCart();
+              setAuthError("");
+              setAuthMode("login");
+              setAuthOpen(true);
+            },
+          }
+        : null,
+    [authUser, sessionVersion, closeCart, clearCart, setProducts],
   );
 
   return (
@@ -184,31 +213,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
         visible={navVisible}
       />
       <main className="min-h-screen pt-[123px] md:pt-[150px]">
-        <WithdrawalSessionContext.Provider value={authUser ? {
-          user: authUser,
-          sessionVersion,
-          clearAfterWithdrawal: () => {
-            setAuthUser(null);
-            setSessionVersion(v => v + 1);
-            setAuthOpen(false);
-            setAuthError("");
-            closeCart();
-            clearCart();
-          },
-          updateUser: (user) => {
-            setAuthUser(user);
-          },
-          signOutAfterPasswordChange: () => {
-            setAuthUser(null);
-            setSessionVersion(v => v + 1);
-            // 로그아웃과 같이 화면의 장바구니만 비웁니다. (clearCart는 서버 장바구니까지 삭제)
-            setProducts([]);
-            closeCart();
-            setAuthError("");
-            setAuthMode("login");
-            setAuthOpen(true);
-          },
-        } : null}>
+        <WithdrawalSessionContext.Provider value={withdrawalSessionValue}>
           {children}
         </WithdrawalSessionContext.Provider>
       </main>

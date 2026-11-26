@@ -1,3 +1,5 @@
+import type { CartBuildPart } from './interface/Product'
+
 export type CartItem = {
   cartItemId?: number
   productId: string
@@ -12,5 +14,6 @@ export type CartItem = {
   manualBuildId?: number
   autoBuildId?: number
   buildType?: 'MANUAL' | 'AUTO'
+  partDetails?: CartBuildPart[]
   customDesignData?: string
 }

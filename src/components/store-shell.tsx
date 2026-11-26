@@ -18,6 +18,10 @@ import {
   logOut,
   type ApiUser,
 } from "@/features/auth/api";
+import {
+  REQUIRE_LOGIN_EVENT,
+  type RequireLoginDetail,
+} from "@/features/auth/login-prompt";
 import { useCart } from "@/features/cart/cart-provider";
 import { WithdrawalSessionContext } from "@/features/user/withdrawal-session";
 import { ApiRequestError } from "@/lib/api-client";
@@ -44,6 +48,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
   // 요청 중에는 버튼·입력창을 잠가서 중복 클릭을 막는다
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [agreements, setAgreements] = useState({
     marketing: false,
     privacy: false,
@@ -88,16 +93,32 @@ export function StoreShell({ children }: { children: ReactNode }) {
     const frame = window.requestAnimationFrame(() => {
       closeCart();
       setAuthError("");
+      setAuthNotice("");
       setAuthMode("login");
       setAuthOpen(true);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [pathname, closeCart]);
 
+  // 장바구니·담기 등 회원 전용 동작에서 비로그인 시 안내 문구와 함께 로그인 패널을 엽니다.
+  useEffect(() => {
+    const onRequireLogin = (event: Event) => {
+      const detail = (event as CustomEvent<RequireLoginDetail>).detail;
+      closeCart();
+      setAuthError("");
+      setAuthMode("login");
+      setAuthNotice(detail?.message || "로그인이 필요한 서비스입니다.");
+      setAuthOpen(true);
+    };
+    window.addEventListener(REQUIRE_LOGIN_EVENT, onRequireLogin);
+    return () => window.removeEventListener(REQUIRE_LOGIN_EVENT, onRequireLogin);
+  }, [closeCart]);
+
   const openAccount = () => {
     if (authChecking) return;
     closeCart();
     setAuthError("");
+    setAuthNotice("");
     setAuthOpen(true);
   };
 
@@ -129,6 +150,7 @@ export function StoreShell({ children }: { children: ReactNode }) {
     try {
       const { user } = await logIn(email, password);
       setAuthUser(user);
+      setAuthNotice("");
       // 로그인한 회원의 장바구니를 서버에서 다시 불러와 헤더 개수에 반영
       refreshCart();
       setSessionVersion(v => v + 1);
@@ -206,6 +228,15 @@ export function StoreShell({ children }: { children: ReactNode }) {
         cartLoading={cartLoading}
         onOpenAccount={openAccount}
         onOpenCart={() => {
+          if (authChecking) return;
+          if (!authUser) {
+            setAuthError("");
+            setAuthMode("login");
+            setAuthNotice("장바구니를 이용하려면 로그인이 필요합니다.");
+            setAuthOpen(true);
+            return;
+          }
+          setAuthNotice("");
           setAuthOpen(false);
           openCart();
         }}
@@ -310,6 +341,14 @@ export function StoreShell({ children }: { children: ReactNode }) {
               <div className="flex-1 overflow-y-auto py-7 pr-1">
                 {authMode === "login" ? (
                   <>
+                    {authNotice && !authError && (
+                      <div
+                        className="mb-5 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-medium leading-5 text-zinc-700"
+                        role="status"
+                      >
+                        {authNotice}
+                      </div>
+                    )}
                     <p className="mb-7 text-sm leading-6 text-zinc-500">
                       이메일과 비밀번호를 입력해 로그인해 주세요.
                     </p>

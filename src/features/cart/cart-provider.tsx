@@ -16,10 +16,8 @@ type CartContextValue = {
   selectAllItems: (selected: boolean) => void;
   clearSelectedItems: () => void;
   clearCart: () => void;
-  openCart: (tab?: 'standard' | 'custom') => void;
+  openCart: () => void;
   closeCart: () => void;
-  activeTab: 'standard' | 'custom';
-  setActiveTab: (tab: 'standard' | 'custom') => void;
 };
 
 function getItemSelectionKey(item: Pick<CartItem, "cartItemId" | "productId">) {
@@ -36,7 +34,6 @@ export function useCart() {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartOpen, setCartOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'standard' | 'custom'>('standard');
   const cartCtx = useContext(ProductCartContext);
   const products: ProductType[] = cartCtx?.products || [];
   const handleUpdateCount = cartCtx?.handleUpdateCount;
@@ -65,6 +62,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         buildType: p.buildType as 'MANUAL' | 'AUTO' | undefined,
         manualBuildId: p.manualBuildId,
         autoBuildId: p.autoBuildId,
+        partDetails: p.partDetails,
         customDesignData: p.customDesignData,
       };
     });
@@ -104,8 +102,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         customDesignData: item.customDesignData,
       });
       if (isSuccess !== false) {
-        // 일반 상품을 담았으면 'standard', 커스텀 상품을 담았으면 'custom' 탭이 즉시 열림
-        setActiveTab(isCustom ? 'custom' : 'standard');
         setCartOpen(true);
         return true;
       }
@@ -155,12 +151,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setDeselectedIds(new Set());
   }, [handleClearCart]);
 
-  const openCart = useCallback((tab?: 'standard' | 'custom') => {
-    if (tab) {
-      setActiveTab(tab);
-    }
+  const openCart = useCallback(() => {
     setCartOpen(true);
-   }, []);
+  }, []);
 
   const closeCart = useCallback(() => setCartOpen(false), []);
 
@@ -178,9 +171,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     clearCart,
     openCart,
     closeCart,
-    activeTab,
-    setActiveTab
-  }), [addItem, cartLoading, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity, activeTab]);
+  }), [addItem, cartLoading, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity]);
 
   return (
     <CartContext.Provider value={value}>

@@ -14,6 +14,7 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MinusIcon, PlusIcon } from '@/components/icons'
+import { requestLoginPrompt } from '@/features/auth/login-prompt'
 import { useCart } from '@/features/cart/cart-provider'
 import {
   deleteCustomKeycapImage,
@@ -1174,7 +1175,7 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
     } catch (authErr) {
       setSubmitting(false)
       if (authErr instanceof ApiRequestError && authErr.status === 401) {
-        alert('로그인이 필요한 서비스입니다.')
+        requestLoginPrompt('커스텀 키캡을 장바구니에 담으려면 로그인이 필요합니다.')
       } else {
         alert('로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
       }

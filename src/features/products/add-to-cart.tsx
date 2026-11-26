@@ -32,7 +32,7 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
 
     const added = await handleAddCart(newProduct)
     if (added) {
-      openCart('standard')
+      openCart()
     }
   }
 

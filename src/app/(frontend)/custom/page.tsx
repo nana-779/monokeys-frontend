@@ -16,6 +16,7 @@ import {
 } from '@/features/products/builds-api'
 import type { Product } from '@/features/products/types'
 import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
+import { requestLoginPrompt } from '@/features/auth/login-prompt'
 import { ProductCartContext } from '@/features/cart/components/CartContext'
 import { ApiRequestError, apiRequest } from '@/lib/api-client'
 
@@ -348,7 +349,7 @@ export default function CustomBuilderPage() {
     } catch (authErr) {
       setSavingBuild(false)
       if (authErr instanceof ApiRequestError && authErr.status === 401) {
-        alert('로그인이 필요한 서비스입니다.')
+        requestLoginPrompt('커스텀 키보드를 장바구니에 담으려면 로그인이 필요합니다.')
       } else {
         alert('로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
       }
@@ -396,7 +397,7 @@ export default function CustomBuilderPage() {
       })
 
       if (added) {
-        openCart('custom')
+        openCart()
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')

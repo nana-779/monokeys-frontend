@@ -1161,7 +1161,7 @@ export function CustomKeycapEditorView({ product }: CustomKeycapEditorViewProps)
       return
     }
     const existingCartQty = cartItems
-      .filter((item) => item.productId === String(product.id))
+      .filter((item) => !item.manualBuildId && !item.autoBuildId && item.productId === String(product.id))
       .reduce((sum, item) => sum + item.quantity, 0)
     if (existingCartQty + quantity > product.stockQuantity) {
       alert(`${product.name}의 현재 재고수는 ${product.stockQuantity}개입니다.`)

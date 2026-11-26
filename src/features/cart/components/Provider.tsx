@@ -67,7 +67,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       isCustom
         ? (newProduct.manualBuildId && p.manualBuildId === newProduct.manualBuildId) ||
           (newProduct.autoBuildId && p.autoBuildId === newProduct.autoBuildId)
-        : p.productId === newProduct.productId
+        : !p.customDesignData && p.productId === newProduct.productId
     );
     let quantityToAdd = newProduct.quantity;
     const maxStock = existing ? existing.stockQuantity : newProduct.stockQuantity;

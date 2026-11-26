@@ -385,7 +385,9 @@ export default function CustomBuilderPage() {
           : { autoBuildId: buildId }),
       })
 
-      openCart()
+      if (added) {
+        openCart('custom')
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')
     } finally {

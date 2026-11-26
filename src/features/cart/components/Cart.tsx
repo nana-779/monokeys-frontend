@@ -220,7 +220,7 @@ function NotThingItem({message, describe} : {message : string, describe : string
 
 function ListItem({ product } : ProductList) {
     const { handleUpdateCount, handleRemoveProduct } = useContext(ProductCartContext);
-    const targetId = product.cartItemId ?? product.manualBuildId ?? product.productId;
+    const targetId = product.cartItemId ?? product.manualBuildId ?? product.autoBuildId ?? product.productId;
     const isMaxStock = product.quantity >= product.stockQuantity;
     return (
         <ul id="In-Item">
@@ -245,6 +245,7 @@ function ListItem({ product } : ProductList) {
                         <button id="Cart-Count-Minus"
                                 className={`${product.quantity > 1 ? "on" : "off"}`}
                                 type="button" tabIndex={-1}
+                                disabled={product.quantity <= 1}
                                 onClick={() => handleUpdateCount(targetId, product.quantity - 1)}>
                             <svg width="10" height="1" viewBox="0 0 10 1" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M0 0.5H9.33333" stroke="currentColor"/>

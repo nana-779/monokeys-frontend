@@ -44,13 +44,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const items = useMemo<CartItem[]>(() => {
     return products.map((p) => {
-      const isCustom = Boolean(
-        p.manualBuildId || p.autoBuildId || p.buildType || p.partType === 'CUSTOM' || p.customDesignData
-      );
+      const resolvedProductId =
+        p.productId > 0
+          ? p.productId
+          : (p.manualBuildId ?? p.autoBuildId ?? p.cartItemId ?? 0);
       return {
-        // 일반 상품은 실제 product 테이블의 productId를 전달하여 결제/주문 검증 통과
-        // 커스텀 상품은 cartItemId 또는 manualBuildId를 전달
-        productId: String(isCustom ? (p.cartItemId ?? p.manualBuildId ?? p.productId) : p.productId),
+        // 실제 product 레코드(일반 단품·커스텀 키캡)는 productId를 유지하고,
+        // 상품 ID가 없는 수동/자동 빌드만 빌드·장바구니 식별자로 대체합니다.
+        productId: String(resolvedProductId),
         cartItemId: p.cartItemId,
         slug: String(p.productId),
         name: p.name,
@@ -63,6 +64,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         buildType: p.buildType as 'MANUAL' | 'AUTO' | undefined,
         manualBuildId: p.manualBuildId,
         autoBuildId: p.autoBuildId,
+        customDesignData: p.customDesignData,
       };
     });
   }, [products]);
@@ -113,7 +115,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback((index: number, quantity: number) => {
     const item = items[index];
     if (item && handleUpdateCount) {
-      handleUpdateCount(Number(item.productId), quantity, item.cartItemId);
+      handleUpdateCount(item.cartItemId ?? Number(item.productId), quantity);
     }
   }, [items, handleUpdateCount]);
 

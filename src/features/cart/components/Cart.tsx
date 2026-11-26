@@ -1,7 +1,8 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import "../style.css";
 import { ProductCartContext } from "./CartContext";
-import type { ProductList, ProductType } from "../interface/Product";
+import { useCart } from "../cart-provider";
+import type { ProductType } from "../interface/Product";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/store-shared";
 
@@ -38,6 +39,7 @@ function parseCustomDesignDetails(raw?: string): ParsedCustomDesign | null {
 
 export function Cart({ open, onClose }: CartProps) {
   const { products, cartLoading, refreshCartIfStale } = useContext(ProductCartContext);
+  const { items, selectedItems, isItemSelected, toggleItemSelected, selectAllItems, removeSelectedItems } = useCart();
 
   // 장바구니 서랍이 열릴 때 마지막 동기화 후 일정 시간이 지난 경우에만 백엔드 상태를 재확인합니다.
   useEffect(() => {
@@ -48,15 +50,21 @@ export function Cart({ open, onClose }: CartProps) {
 
   const router = useRouter();
 
-  const { totalCost, allItemCount } = useMemo(() => {
+  const { selectedCost, selectedQuantity, selectedLineCount } = useMemo(() => {
     let cost = 0;
-    let count = 0;
-    for (const p of products) {
-      cost += p.price * p.quantity;
-      count += p.quantity;
+    let qty = 0;
+    for (const item of selectedItems) {
+      cost += item.unitPrice * item.quantity;
+      qty += item.quantity;
     }
-    return { totalCost: cost, allItemCount: count };
-  }, [products]);
+    return {
+      selectedCost: cost,
+      selectedQuantity: qty,
+      selectedLineCount: selectedItems.length,
+    };
+  }, [selectedItems]);
+
+  const isAllSelected = items.length > 0 && selectedLineCount === items.length;
 
   return (
     <div
@@ -103,33 +111,67 @@ export function Cart({ open, onClose }: CartProps) {
                 describe="원하는 상품이나 나만의 커스텀 키보드를 담아보세요."
               />
             ) : (
-              <ul className="w-full space-y-2.5">
-                {products.map((product: ProductType, idx: number) => (
-                  <ListItem
-                    key={product.cartItemId ?? `cart-${product.manualBuildId ?? product.autoBuildId ?? product.productId}-${idx}`}
-                    product={product}
-                  />
-                ))}
-              </ul>
+              <>
+                <div className="mb-2.5 flex w-full items-center justify-between border-b border-zinc-200 pb-2.5">
+                  <label className="inline-flex cursor-pointer select-none items-center gap-2 text-xs font-medium text-zinc-700">
+                    <input
+                      aria-label="장바구니 상품 전체 선택"
+                      checked={isAllSelected}
+                      className="h-4 w-4 cursor-pointer rounded border-zinc-300 accent-zinc-950"
+                      onChange={(event) => selectAllItems(event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>
+                      전체 선택 ({selectedLineCount}/{items.length})
+                    </span>
+                  </label>
+                  <button
+                    className="text-xs font-medium text-zinc-500 transition hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={selectedLineCount === 0}
+                    onClick={() => void removeSelectedItems()}
+                    type="button"
+                  >
+                    선택 삭제
+                  </button>
+                </div>
+                <ul className="w-full space-y-2.5">
+                  {products.map((product: ProductType, idx: number) => {
+                    const cartItem = items[idx] ?? {
+                      cartItemId: product.cartItemId,
+                      productId: String(product.productId),
+                    };
+                    return (
+                      <ListItem
+                        checked={isItemSelected(cartItem)}
+                        key={product.cartItemId ?? `cart-${product.manualBuildId ?? product.autoBuildId ?? product.productId}-${idx}`}
+                        onToggleSelect={() => toggleItemSelected(cartItem)}
+                        product={product}
+                      />
+                    );
+                  })}
+                </ul>
+              </>
             )}
           </div>
 
           <div id="Cart-Footer">
             <div id="Total-Const-Fraim">
-              <p id="Subtotal">Subtotal</p>
-              <p id="Total-Cost">{formatPrice(totalCost)}</p>
+              <p id="Subtotal">
+                {products.length > 0 ? `Subtotal (${selectedLineCount}건)` : "Subtotal"}
+              </p>
+              <p id="Total-Cost">{formatPrice(selectedCost)}</p>
             </div>
             <button
               id="Cart-Payment-Button"
-              className={`transition-all duration-150 ${allItemCount > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
+              className={`transition-all duration-150 ${selectedQuantity > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
               type="button"
-              disabled={allItemCount === 0}
+              disabled={selectedQuantity === 0}
               onClick={() => {
                 onClose();
                 router.push("/checkout");
               }}
             >
-              CHECKOUT
+              {selectedLineCount > 0 ? `CHECKOUT (${selectedLineCount})` : "상품을 선택해 주세요"}
             </button>
           </div>
         </aside>
@@ -173,7 +215,13 @@ function NotThingItem({ message, describe }: { message: string; describe: string
   );
 }
 
-function ListItem({ product }: ProductList) {
+type ListItemProps = {
+  product: ProductType;
+  checked: boolean;
+  onToggleSelect: () => void;
+};
+
+function ListItem({ product, checked, onToggleSelect }: ListItemProps) {
   const { handleUpdateCount, handleRemoveProduct } = useContext(ProductCartContext);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -196,18 +244,35 @@ function ListItem({ product }: ProductList) {
 
   return (
     <li id="In-Item" className={cardHighlightClass}>
+      <label
+        className="flex shrink-0 cursor-pointer items-center pt-0.5"
+        style={{ order: -1 }}
+      >
+        <input
+          aria-label={`${product.name || "상품"} 선택`}
+          checked={checked}
+          className="h-4 w-4 cursor-pointer rounded border-zinc-300 accent-zinc-950"
+          onChange={onToggleSelect}
+          type="checkbox"
+        />
+      </label>
       {product.thumbnailUrl ? (
-        <img id="Cart-Item-Img" className="rounded-sm border border-zinc-200 object-cover" src={product.thumbnailUrl} alt={product.name || "상품 이미지"} />
+        <img
+          id="Cart-Item-Img"
+          className={`rounded-sm border border-zinc-200 object-cover transition-opacity ${checked ? "" : "opacity-55"}`}
+          src={product.thumbnailUrl}
+          alt={product.name || "상품 이미지"}
+        />
       ) : (
         <div
           id="Cart-Item-Img"
-          className="rounded-sm border border-zinc-200"
+          className={`rounded-sm border border-zinc-200 transition-opacity ${checked ? "" : "opacity-55"}`}
           style={{ display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f4f4f5", fontSize: "11px", color: "#a1a1aa" }}
         >
           NO IMG
         </div>
       )}
-      <div id="Cart-Item-Distance">
+      <div id="Cart-Item-Distance" className={`transition-opacity ${checked ? "" : "opacity-55"}`}>
         <div className="space-y-1.5">
           {/* 상품 구분 배지 */}
           <div className="flex flex-wrap items-center gap-1.5">

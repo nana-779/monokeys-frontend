@@ -1,5 +1,7 @@
 import type { CartBuildPart } from './interface/Product'
 
+export type CartItemKind = 'STANDARD' | 'CUSTOM_KEYCAP' | 'MANUAL_BUILD' | 'AUTO_BUILD'
+
 export type CartItem = {
   cartItemId?: number
   productId: string
@@ -11,6 +13,8 @@ export type CartItem = {
   unitPrice: number
   shippingFee: number
   quantity: number
+  itemKind?: CartItemKind
+  includeAssembly?: boolean
   manualBuildId?: number
   autoBuildId?: number
   buildType?: 'MANUAL' | 'AUTO'

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useCart } from '@/features/cart/cart-provider'
 import { getCurrentUser } from '@/features/auth/api'
 import { formatPrice } from '@/lib/store-shared'
-import { submitOrderApi } from './api'
+import { failPaymentApi, submitOrderApi } from './api'
 import { useTossWidgets } from '@/features/payments/use-toss-widgets'
 import { renderPaymentWidgets } from '@/features/payments/order-widget-rendering'
 import { paymentErrorMessage } from '@/features/payments/payment-request'
@@ -245,6 +245,7 @@ export function CheckoutForm() {
       return
     }
 
+    let createdOrderNumber: string | null = null
     try {
       const items = selectedItems.map((item) => ({
         productId: Number(item.productId),
@@ -264,9 +265,13 @@ export function CheckoutForm() {
         deliveryMemo: deliveryMemo.trim(),
         items,
       })
+      createdOrderNumber = result.orderNumber
 
       if (!widgets || !widgetReady) {
         setMessage('결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.')
+        if (createdOrderNumber) {
+          void failPaymentApi(createdOrderNumber, '결제 위젯 미준비')
+        }
         setIsSubmitting(false)
         return
       }
@@ -287,6 +292,9 @@ export function CheckoutForm() {
         failUrl: `${window.location.origin}/checkout/fail`,
       })
     } catch (err) {
+      if (createdOrderNumber) {
+        void failPaymentApi(createdOrderNumber, paymentErrorMessage(err))
+      }
       setMessage(paymentErrorMessage(err))
     } finally {
       setIsSubmitting(false)
@@ -298,7 +306,9 @@ export function CheckoutForm() {
       <form onSubmit={submitOrder} className="grid grid-cols-[1fr_.75fr] gap-16 max-lg:grid-cols-1">
         <div>
           <p className="mb-4 text-xs font-semibold tracking-[0.2em] text-zinc-500">CHECKOUT</p>
-          <h1 className="mb-12 text-5xl font-medium tracking-[-0.06em]">Where should we send it?</h1>
+          <h1 className="mb-12 text-5xl font-medium tracking-[-0.06em]">
+            Where should we send it?
+          </h1>
           <div className="space-y-6">
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -369,8 +379,12 @@ export function CheckoutForm() {
                 name="phone"
                 required
                 placeholder="010-0000-0000"
-                value={[phone.slice(0, 3), phone.slice(3, 7), phone.slice(7)].filter(Boolean).join('-')}
-                onChange={(event) => setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 11))}
+                value={[phone.slice(0, 3), phone.slice(3, 7), phone.slice(7)]
+                  .filter(Boolean)
+                  .join('-')}
+                onChange={(event) =>
+                  setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 11))
+                }
               />
             </div>
 
@@ -515,9 +529,7 @@ export function CheckoutForm() {
             &times;
           </button>
         </div>
-        {postcodeMessage && (
-          <p className="mb-3 text-sm text-zinc-500">{postcodeMessage}</p>
-        )}
+        {postcodeMessage && <p className="mb-3 text-sm text-zinc-500">{postcodeMessage}</p>}
         <div ref={postcodeHost} className="h-[420px] w-full" />
       </dialog>
     </>

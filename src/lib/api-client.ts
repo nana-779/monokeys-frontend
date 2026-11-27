@@ -25,10 +25,19 @@ export class ApiRequestError extends Error {
   }
 }
 
-// 공개 가입 요청은 로그인 재발급 때문에 인증번호 발송이나 가입이 다시 실행되면 안 됩니다.
+// 재발급을 시도하지 않는 경로 목록입니다.
+// 로그인 상태 확인(/api/auth/me)이나 장바구니 조회(/api/cart)에서 발생한 401은
+// 로그인하지 않은 일반 방문자이므로 무의미한 재발급 네트워크 요청을 차단하여 속도를 높입니다.
 const NO_REFRESH_PATHS = [
-  "/api/auth/login", "/api/auth/logout", "/api/auth/refresh",
-  "/api/auth/email/send", "/api/auth/email/verify", "/api/users/signup",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/refresh",
+  "/api/auth/me",
+  "/api/cart",
+  // 인증번호 발송·검증과 공개 회원가입은 재발급 후 중복 실행하지 않습니다.
+  "/api/auth/email/send",
+  "/api/auth/email/verify",
+  "/api/users/signup",
 ];
 
 // 진행 중인 재발급 요청입니다. 여러 요청이 동시에 401을 받아도 재발급은 한 번만 보냅니다.

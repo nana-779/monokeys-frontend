@@ -29,8 +29,7 @@ const NO_REFRESH_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/refresh",
-  "/api/auth/me",
-  "/api/cart"
+  "/api/auth/me"
 ];
 
 // 진행 중인 재발급 요청입니다. 여러 요청이 동시에 401을 받아도 재발급은 한 번만 보냅니다.

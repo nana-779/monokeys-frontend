@@ -230,12 +230,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshCart, removingSelected, selectedItems]);
 
-  const clearSelectedItems = useCallback(() => {
-    if (handleClearCart) {
-      handleClearCart();
-    }
+  const clearSelectedItems = useCallback(async () => {
     setDeselectedIds(new Set());
-  }, [handleClearCart]);
+    if (refreshCart) {
+      await refreshCart();
+    }
+  }, [refreshCart]);
 
   const clearCart = useCallback(() => {
     if (handleClearCart) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useCart } from '@/features/cart/cart-provider'
 import { getCurrentUser } from '@/features/auth/api'
 import { formatPrice } from '@/lib/store-shared'
@@ -9,6 +9,7 @@ import { useTossWidgets } from '@/features/payments/use-toss-widgets'
 import { renderPaymentWidgets } from '@/features/payments/order-widget-rendering'
 import { paymentErrorMessage } from '@/features/payments/payment-request'
 import { loadPostcode, postcodeError } from '@/features/user/postcode'
+import { ProductCartContext } from '@/features/cart/components/CartContext'
 import Link from 'next/link'
 
 const PART_TYPE_LABELS: Record<string, string> = {
@@ -20,6 +21,8 @@ const PART_TYPE_LABELS: Record<string, string> = {
 
 export function CheckoutForm() {
   const { selectedItems } = useCart()
+  const { refreshCart } = useContext(ProductCartContext)
+
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [userEmail, setUserEmail] = useState('')
@@ -31,6 +34,13 @@ export function CheckoutForm() {
   const [deliveryMemo, setDeliveryMemo] = useState('')
   const [widgetReady, setWidgetReady] = useState(false)
   const [postcodeMessage, setPostcodeMessage] = useState('')
+
+  // 주문 페이지 진입 시 최신 수량/재고 동기화
+  useEffect(() => {
+    if (typeof refreshCart === 'function') {
+      void refreshCart()
+    }
+  }, [refreshCart])
 
   const postcodeDialog = useRef<HTMLDialogElement>(null)
   const postcodeHost = useRef<HTMLDivElement>(null)

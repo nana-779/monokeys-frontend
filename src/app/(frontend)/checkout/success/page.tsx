@@ -40,7 +40,7 @@ function CheckoutSuccessContent() {
           amount,
         })
 
-        clearSelectedItems()
+        void clearSelectedItems()
         setOrder(confirmedOrder)
         setStatus('success')
       } catch (err) {

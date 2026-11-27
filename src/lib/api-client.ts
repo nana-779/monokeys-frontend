@@ -33,7 +33,6 @@ const NO_REFRESH_PATHS = [
   "/api/auth/logout",
   "/api/auth/refresh",
   "/api/auth/me",
-  "/api/cart",
   // 인증번호 발송·검증과 공개 회원가입은 재발급 후 중복 실행하지 않습니다.
   "/api/auth/email/send",
   "/api/auth/email/verify",

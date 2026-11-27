@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useCart } from '@/features/cart/cart-provider'
 import { getCurrentUser } from '@/features/auth/api'
 import { formatPrice } from '@/lib/store-shared'
-import { submitOrderApi } from './api'
+import { failPaymentApi, submitOrderApi } from './api'
 import { useTossWidgets } from '@/features/payments/use-toss-widgets'
 import { renderPaymentWidgets } from '@/features/payments/order-widget-rendering'
 import { paymentErrorMessage } from '@/features/payments/payment-request'
@@ -245,9 +245,14 @@ export function CheckoutForm() {
       return
     }
 
+    let createdOrderNumber: string | null = null
     try {
       const items = selectedItems.map((item) => ({
-        productId: Number(item.productId),
+        cartItemId: item.cartItemId,
+        productId: item.productId && !item.manualBuildId && !item.autoBuildId ? Number(item.productId) : undefined,
+        manualBuildId: item.manualBuildId,
+        autoBuildId: item.autoBuildId,
+        customDesignData: item.customDesignData,
         quantity: item.quantity,
       }))
 
@@ -264,9 +269,13 @@ export function CheckoutForm() {
         deliveryMemo: deliveryMemo.trim(),
         items,
       })
+      createdOrderNumber = result.orderNumber
 
       if (!widgets || !widgetReady) {
         setMessage('결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.')
+        if (createdOrderNumber) {
+          void failPaymentApi(createdOrderNumber, '결제 위젯 미준비')
+        }
         setIsSubmitting(false)
         return
       }
@@ -287,6 +296,9 @@ export function CheckoutForm() {
         failUrl: `${window.location.origin}/checkout/fail`,
       })
     } catch (err) {
+      if (createdOrderNumber) {
+        void failPaymentApi(createdOrderNumber, paymentErrorMessage(err))
+      }
       setMessage(paymentErrorMessage(err))
     } finally {
       setIsSubmitting(false)
@@ -298,7 +310,9 @@ export function CheckoutForm() {
       <form onSubmit={submitOrder} className="grid grid-cols-[1fr_.75fr] gap-16 max-lg:grid-cols-1">
         <div>
           <p className="mb-4 text-xs font-semibold tracking-[0.2em] text-zinc-500">CHECKOUT</p>
-          <h1 className="mb-12 text-5xl font-medium tracking-[-0.06em]">Where should we send it?</h1>
+          <h1 className="mb-12 text-5xl font-medium tracking-[-0.06em]">
+            Where should we send it?
+          </h1>
           <div className="space-y-6">
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -369,8 +383,12 @@ export function CheckoutForm() {
                 name="phone"
                 required
                 placeholder="010-0000-0000"
-                value={[phone.slice(0, 3), phone.slice(3, 7), phone.slice(7)].filter(Boolean).join('-')}
-                onChange={(event) => setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 11))}
+                value={[phone.slice(0, 3), phone.slice(3, 7), phone.slice(7)]
+                  .filter(Boolean)
+                  .join('-')}
+                onChange={(event) =>
+                  setPhone(event.target.value.replace(/[^0-9]/g, '').slice(0, 11))
+                }
               />
             </div>
 
@@ -449,20 +467,66 @@ export function CheckoutForm() {
         <aside className="h-fit rounded-xl bg-zinc-100 p-7 lg:sticky lg:top-28">
           <h2 className="text-xl font-medium tracking-[-0.03em]">Order summary</h2>
           <div className="my-6 divide-y divide-zinc-200 border-y border-zinc-200">
-            {selectedItems.map((item, index) => (
-              <div
-                className="flex justify-between gap-5 py-4 text-sm"
-                key={`${item.productId}-${index}`}
-              >
-                <div>
-                  <p className="font-medium">
-                    {item.name} × {item.quantity}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">{item.optionLabel}</p>
+            {selectedItems.map((item, index) => {
+              const isBuild = Boolean(item.manualBuildId || item.autoBuildId || item.buildType);
+              const isCustomKeycap = Boolean(!isBuild && item.customDesignData);
+              const isAutoBuild = item.buildType === "AUTO" || Boolean(item.autoBuildId);
+              return (
+                <div
+                  className="flex items-center gap-4 py-4 text-sm"
+                  key={item.cartItemId ?? `${item.productId}-${index}`}
+                >
+                  {/* 1. 상품 썸네일 이미지 */}
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="size-16 shrink-0 rounded-md border border-zinc-200 object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-16 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-[10px] text-zinc-400">
+                      NO IMG
+                    </div>
+                  )}
+                  {/* 2. 상품 정보 및 배지 */}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {/* 장바구니와 동일한 배지 스타일 */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {isBuild ? (
+                        <>
+                          <span className="inline-flex items-center rounded bg-zinc-950 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                            커스텀 키보드
+                          </span>
+                          <span className="inline-flex items-center rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700">
+                            {isAutoBuild ? "자동 추천" : "수동 조립"}
+                          </span>
+                          <span className="text-[11px] text-zinc-500">
+                            {item.includeAssembly ? "조립 대행" : "직접 조립"}
+                          </span>
+                        </>
+                      ) : isCustomKeycap ? (
+                        <span className="inline-flex items-center rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                          커스텀 키캡
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
+                          일반 상품
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate font-medium text-zinc-900">{item.name}</p>
+                    <p className="text-xs text-zinc-500">수량: {item.quantity}개</p>
+                    {item.optionLabel && (
+                      <p className="truncate text-xs text-zinc-400">{item.optionLabel}</p>
+                    )}
+                  </div>
+                  {/* 3. 가격 */}
+                  <strong className="shrink-0 text-sm font-semibold">
+                    {formatPrice(item.unitPrice * item.quantity)}
+                  </strong>
                 </div>
-                <strong>{formatPrice(item.unitPrice * item.quantity)}</strong>
-              </div>
-            ))}
+              );
+            })}
             {!selectedItems.length && (
               <p className="py-8 text-center text-sm text-zinc-500">
                 선택된 상품이 없습니다. 장바구니에서 주문할 상품을 선택해 주세요.
@@ -515,9 +579,7 @@ export function CheckoutForm() {
             &times;
           </button>
         </div>
-        {postcodeMessage && (
-          <p className="mb-3 text-sm text-zinc-500">{postcodeMessage}</p>
-        )}
+        {postcodeMessage && <p className="mb-3 text-sm text-zinc-500">{postcodeMessage}</p>}
         <div ref={postcodeHost} className="h-[420px] w-full" />
       </dialog>
     </>

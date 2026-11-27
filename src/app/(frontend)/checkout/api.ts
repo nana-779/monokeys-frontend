@@ -7,7 +7,11 @@ export type ApiResponse<T> = {
 }
 
 export type OrderItemInput = {
-  productId: number
+  cartItemId?: number
+  productId?: number
+  manualBuildId?: number
+  autoBuildId?: number
+  customDesignData?: string
   quantity: number
 }
 

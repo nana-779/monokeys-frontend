@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ProductType } from "../interface/Product";
 import { ProductCartContext } from "./CartContext";
 import {
@@ -15,14 +15,29 @@ import {
 const isTargetItem = (p: ProductType, id: number) =>
   p.cartItemId ? p.cartItemId === id : p.productId === id;
 
+const CART_STALE_MS = 15_000;
+
 export function ProductCartProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<ProductType[]>([]);
+  const [cartLoading, setCartLoading] = useState(true);
+  const lastFetchedAtRef = useRef(0);
 
   // 장바구니 목록 조회
   const refreshCart = useCallback(async () => {
-    const list = await getCartApi();
-    setProducts(list);
+    try {
+      const list = await getCartApi();
+      setProducts(list);
+      lastFetchedAtRef.current = Date.now();
+    } finally {
+      setCartLoading(false);
+    }
   }, []);
+
+  // 서랍 오픈 시 직전 동기화 이후 15초가 넘었을 때만 재조회해 중복 GET /api/cart 방지
+  const refreshCartIfStale = useCallback(async () => {
+    if (cartLoading || Date.now() - lastFetchedAtRef.current < CART_STALE_MS) return;
+    await refreshCart();
+  }, [cartLoading, refreshCart]);
 
   useEffect(() => {
     refreshCart();
@@ -67,7 +82,7 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       isCustom
         ? (newProduct.manualBuildId && p.manualBuildId === newProduct.manualBuildId) ||
           (newProduct.autoBuildId && p.autoBuildId === newProduct.autoBuildId)
-        : p.productId === newProduct.productId
+        : !p.customDesignData && p.productId === newProduct.productId
     );
     let quantityToAdd = newProduct.quantity;
     const maxStock = existing ? existing.stockQuantity : newProduct.stockQuantity;
@@ -128,11 +143,13 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
     <ProductCartContext.Provider
       value={{
         products,
+        cartLoading,
         handleUpdateCount,
         handleRemoveProduct,
         handleAddCart,
         handleClearCart,
         refreshCart,
+        refreshCartIfStale,
         setProducts,
       }}
     >

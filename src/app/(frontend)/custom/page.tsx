@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -16,6 +16,7 @@ import {
 } from '@/features/products/builds-api'
 import type { Product } from '@/features/products/types'
 import { formatPrice, isProductSoldOut, mediaFrom, type StoreProduct } from '@/lib/store-shared'
+import { requestLoginPrompt } from '@/features/auth/login-prompt'
 import { ProductCartContext } from '@/features/cart/components/CartContext'
 import { ApiRequestError, apiRequest } from '@/lib/api-client'
 
@@ -179,33 +180,43 @@ export default function CustomBuilderPage() {
   const [recommendLoading, setRecommendLoading] = useState(false)
   const [savingBuild, setSavingBuild] = useState(false)
 
-  // ==================== 부품 목록 데이터 분리 ====================
-  const allHousings = catalogProducts.filter((p) => p.parentCategoryId === 'housing')
-  const allPcbs = catalogProducts.filter(
-    (p) => p.parentCategoryId === 'keyboards' || p.parentCategoryId === 'pcb',
-  )
-  const allSwitches = catalogProducts.filter(
-    (p) => p.parentCategoryId === 'switches' || p.parentCategoryId === 'switch',
-  )
-  const allKeycaps = catalogProducts.filter(
-    (p) =>
-      (p.parentCategoryId === 'keycaps' || p.parentCategoryId === 'keycap') &&
-      p.categoryId !== 'keycap-custom',
-  )
+  // ==================== 부품 목록 데이터 분리 (카탈로그 변경 시에만 재분류) ====================
+  const { allHousings, allPcbs, allSwitches, allKeycaps } = useMemo(() => ({
+    allHousings: catalogProducts.filter((p) => p.parentCategoryId === 'housing'),
+    allPcbs: catalogProducts.filter(
+      (p) => p.parentCategoryId === 'keyboards' || p.parentCategoryId === 'pcb',
+    ),
+    allSwitches: catalogProducts.filter(
+      (p) => p.parentCategoryId === 'switches' || p.parentCategoryId === 'switch',
+    ),
+    allKeycaps: catalogProducts.filter(
+      (p) =>
+        (p.parentCategoryId === 'keycaps' || p.parentCategoryId === 'keycap') &&
+        p.categoryId !== 'keycap-custom',
+    ),
+  }), [catalogProducts])
 
   // ==================== 수동 모드 호환 필터 ====================
   // 1. 호환 기판: 선택된 하우징의 layout과 일치
-  const compatiblePcbs = manualSelection.housing
-    ? allPcbs.filter((pcb) => pcb.layout === manualSelection.housing?.layout)
-    : allPcbs
+  const compatiblePcbs = useMemo(
+    () =>
+      manualSelection.housing
+        ? allPcbs.filter((pcb) => pcb.layout === manualSelection.housing?.layout)
+        : allPcbs,
+    [allPcbs, manualSelection.housing],
+  )
 
   // 2. 호환 스위치: 선택된 기판의 supportPins 규격 만족 (기판 없으면 전체 허용)
-  const compatibleSwitches = manualSelection.pcb
-    ? allSwitches.filter((sw) => {
-      const pins = manualSelection.pcb?.supportPins || [3, 5]
-      return sw.pin ? pins.includes(sw.pin) : true
-    })
-    : allSwitches
+  const compatibleSwitches = useMemo(
+    () =>
+      manualSelection.pcb
+        ? allSwitches.filter((sw) => {
+          const pins = manualSelection.pcb?.supportPins || [3, 5]
+          return sw.pin ? pins.includes(sw.pin) : true
+        })
+        : allSwitches,
+    [allSwitches, manualSelection.pcb],
+  )
 
   // 수동 부품 선택 및 선택 해제(토글) 핸들러
   const handleSelectPart = (category: keyof ManualSelectionState, product: Product) => {
@@ -338,7 +349,7 @@ export default function CustomBuilderPage() {
     } catch (authErr) {
       setSavingBuild(false)
       if (authErr instanceof ApiRequestError && authErr.status === 401) {
-        alert('로그인이 필요한 서비스입니다.')
+        requestLoginPrompt('커스텀 키보드를 장바구니에 담으려면 로그인이 필요합니다.')
       } else {
         alert('로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
       }
@@ -385,7 +396,9 @@ export default function CustomBuilderPage() {
           : { autoBuildId: buildId }),
       })
 
-      openCart()
+      if (added) {
+        openCart()
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : '커스텀 빌드 저장에 실패했습니다.')
     } finally {
@@ -485,9 +498,7 @@ export default function CustomBuilderPage() {
       </div>
 
       {catalogLoading ? (
-        <div className="py-24 text-center text-sm text-zinc-400">
-          커스텀 부품 목록을 불러오는 중입니다...
-        </div>
+        <CustomBuilderSkeleton mode={mode} />
       ) : catalogError ? (
         <BackendErrorState
           message={catalogError}
@@ -1089,5 +1100,89 @@ export default function CustomBuilderPage() {
         </>
       )}
     </section>
+  )
+}
+
+function CustomBuilderSkeleton({ mode }: { mode: 'auto' | 'manual' }) {
+  if (mode === 'auto') {
+    return (
+      <div
+        aria-busy="true"
+        aria-label="커스텀 부품 목록을 불러오는 중입니다"
+        className="mx-auto max-w-3xl rounded-2xl border border-zinc-200 bg-white p-10 shadow-sm"
+        role="status"
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <div className="h-3.5 w-28 animate-pulse rounded bg-zinc-200" />
+          <div className="h-3.5 w-20 animate-pulse rounded bg-zinc-100" />
+        </div>
+        <div className="mb-8 h-1 w-full animate-pulse rounded-full bg-zinc-200" />
+        <div className="mb-6 h-8 w-3/4 animate-pulse rounded bg-zinc-200" />
+        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+          {[0, 1, 2, 3].map((idx) => (
+            <div className="space-y-2 rounded-xl border border-zinc-200 p-5" key={idx}>
+              <div className="h-5 w-2/3 animate-pulse rounded bg-zinc-200" />
+              <div className="h-3.5 w-full animate-pulse rounded bg-zinc-100" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-10 flex items-center justify-between border-t border-zinc-100 pt-6">
+          <div className="h-9 w-24 animate-pulse rounded-full bg-zinc-100" />
+          <div className="h-10 w-36 animate-pulse rounded-full bg-zinc-200" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      aria-busy="true"
+      aria-label="커스텀 부품 목록을 불러오는 중입니다"
+      className="grid grid-cols-[1fr_360px] gap-10 max-lg:grid-cols-1"
+      role="status"
+    >
+      <div>
+        <div className="mb-6 grid grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map((step) => (
+            <div className="space-y-2 rounded-xl border border-zinc-200 bg-white p-3.5" key={step}>
+              <div className="h-3.5 w-20 animate-pulse rounded bg-zinc-200" />
+              <div className="h-3 w-full animate-pulse rounded bg-zinc-100" />
+            </div>
+          ))}
+        </div>
+        <div className="mb-6 h-10 w-full animate-pulse rounded-lg bg-zinc-100" />
+        <div className="grid grid-cols-3 gap-4 max-sm:grid-cols-1">
+          {[0, 1, 2, 3, 4, 5].map((card) => (
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white" key={card}>
+              <div className="aspect-video w-full animate-pulse bg-zinc-100" />
+              <div className="space-y-2 p-4">
+                <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
+                <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-200" />
+                <div className="h-3.5 w-1/3 animate-pulse rounded bg-zinc-200" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6">
+        <div className="mb-5 h-5 w-32 animate-pulse rounded bg-zinc-200" />
+        <div className="space-y-4">
+          {[0, 1, 2, 3].map((row) => (
+            <div className="flex items-center justify-between gap-4" key={row}>
+              <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-200" />
+              <div className="h-4 w-16 animate-pulse rounded bg-zinc-100" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 border-t border-zinc-200 pt-5">
+          <div className="flex items-baseline justify-between">
+            <div className="h-3.5 w-16 animate-pulse rounded bg-zinc-200" />
+            <div className="h-7 w-28 animate-pulse rounded bg-zinc-200" />
+          </div>
+          <div className="mt-6 h-11 w-full animate-pulse rounded-md bg-zinc-200" />
+        </div>
+      </div>
+    </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { ProductGrid } from '@/features/products/product-grid'
+import { ProductGrid, ProductGridSkeleton } from '@/features/products/product-grid'
 
 export default function ProductsPage() {
   return (
@@ -12,11 +12,7 @@ export default function ProductsPage() {
           Everything for a more considered desk.
         </h1>
       </div>
-      <Suspense
-        fallback={
-          <div className="py-24 text-center text-sm text-zinc-400">Loading collection...</div>
-        }
-      >
+      <Suspense fallback={<ProductGridSkeleton />}>
         <ProductGrid />
       </Suspense>
     </section>

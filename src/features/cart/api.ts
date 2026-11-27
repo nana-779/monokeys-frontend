@@ -1,4 +1,5 @@
 import { ApiRequestError, apiRequest } from '@/lib/api-client'
+import { requestLoginPrompt } from '@/features/auth/login-prompt'
 import type { ProductType } from './interface/Product'
 
 export type AddCartTarget = number | { productId?: number; manualBuildId?: number; autoBuildId?: number; customDesignData?: string }
@@ -47,6 +48,7 @@ export async function getCartApi(): Promise<ProductType[]> {
         customBuildId: item.customBuildId ?? 0,
         includeAssembly: Boolean(item.includeAssembly),
         partProductIds: item.partProductIds ?? [],
+        partDetails: Array.isArray(item.partDetails) ? item.partDetails : [],
         thumbnailUrl: customMeta.previewUrl ?? item.thumbnailUrl ?? '',
         buildName: customMeta.label || item.buildName || '',
         customDesignData: item.customDesignData,
@@ -74,7 +76,11 @@ export async function addCartItemApi(target: AddCartTarget, quantity: number): P
     return true;
   } catch (error) {
     if (error instanceof ApiRequestError) {
-      alert(error.status === 401 ? '로그인이 필요한 서비스입니다.' : error.message)
+      if (error.status === 401) {
+        requestLoginPrompt('장바구니를 이용하려면 로그인이 필요합니다.')
+      } else {
+        alert(error.message)
+      }
       return false
     }
     alert('장바구니에 담지 못했습니다.')
@@ -92,7 +98,11 @@ export async function changeCartItem(targetId: number, quantity: number): Promis
     return true
   } catch (error) {
     if (error instanceof ApiRequestError) {
-      alert(error.status === 401 ? '로그인이 필요한 서비스입니다.' : error.message)
+      if (error.status === 401) {
+        requestLoginPrompt('장바구니를 이용하려면 로그인이 필요합니다.')
+      } else {
+        alert(error.message)
+      }
       return false
     }
     alert('수량을 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.')

@@ -9,6 +9,7 @@ import { useTossWidgets } from '@/features/payments/use-toss-widgets'
 import { renderPaymentWidgets } from '@/features/payments/order-widget-rendering'
 import { paymentErrorMessage } from '@/features/payments/payment-request'
 import { loadPostcode, postcodeError } from '@/features/user/postcode'
+import Link from 'next/link'
 
 const PART_TYPE_LABELS: Record<string, string> = {
   HOUSING: '하우징',
@@ -310,6 +311,30 @@ export function CheckoutForm() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (selectedItems.length === 0) {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-zinc-200 bg-white p-10 text-center shadow-sm my-12">
+        <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
+          <svg className="size-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-zinc-900">주문할 상품이 없습니다</h2>
+        <p className="mt-2 text-sm text-zinc-500">
+          장바구니에서 주문할 상품을 먼저 선택해 주세요.
+        </p>
+        <div className="mt-7 flex justify-center gap-3">
+          <Link
+            href="/"
+            className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800"
+          >
+            쇼핑 계속하기
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

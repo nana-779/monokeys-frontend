@@ -94,7 +94,9 @@ const categories: CategoryItem[] = [
 
 type SiteHeaderProps = {
   cartCount: number
+  cartLoading?: boolean
   user: ApiUser | null
+  authChecking?: boolean
   visible: boolean
   onOpenCart: () => void
   onOpenAccount: () => void
@@ -102,7 +104,9 @@ type SiteHeaderProps = {
 
 export function SiteHeader({
   cartCount,
+  cartLoading = false,
   user,
+  authChecking = false,
   visible,
   onOpenCart,
   onOpenAccount,
@@ -307,11 +311,28 @@ export function SiteHeader({
               SEARCH
             </button>
             <button className={`whitespace-nowrap ${button_interaction}`} onClick={onOpenCart} type="button">
-              CART <span aria-label={`${cartCount} items`}>({cartCount})</span>
+              CART{' '}
+              {cartLoading ? (
+                <span
+                  aria-label="장바구니 수량 확인 중"
+                  className="inline-block h-[0.95em] w-6 animate-pulse rounded-xs bg-zinc-200 align-[-0.12em]"
+                />
+              ) : (
+                <span aria-label={`${cartCount} items`}>({cartCount})</span>
+              )}
             </button>
-            <button className={`whitespace-nowrap ${button_interaction}`} onClick={onOpenAccount} type="button">
-              {user ? (user.role === 'admin' ? 'ADMIN' : 'MYPAGE') : 'LOGIN'}
-            </button>
+            {authChecking ? (
+              <span
+                aria-busy="true"
+                aria-label="로그인 상태 확인 중"
+                className="inline-block h-[14px] w-[38px] animate-pulse rounded-xs bg-zinc-200 sm:h-[16px] sm:w-[46px] lg:h-[19px] lg:w-[56px]"
+                role="status"
+              />
+            ) : (
+              <button className={`whitespace-nowrap ${button_interaction}`} onClick={onOpenAccount} type="button">
+                {user ? (user.role === 'admin' ? 'ADMIN' : 'MYPAGE') : 'LOGIN'}
+              </button>
+            )}
           </nav>
 
           <nav

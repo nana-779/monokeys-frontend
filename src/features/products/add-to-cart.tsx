@@ -15,7 +15,7 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
   const optionValue = option?.value ?? ''
   const unitPrice = product.basePrice + (option?.priceAdjustment ?? 0)
 
-  const handleClick = () => {
+  const handleClick = async () => {
     const newProduct: ProductType = {
       productId: product.id,
       name: product.name,
@@ -30,8 +30,10 @@ export function AddToCart({ product, image }: { product: StoreProduct; image?: s
       includeAssembly: false,
     }
 
-    handleAddCart(newProduct)
-    openCart()
+    const added = await handleAddCart(newProduct)
+    if (added) {
+      openCart()
+    }
   }
 
   return (

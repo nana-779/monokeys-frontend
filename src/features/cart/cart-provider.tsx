@@ -1,27 +1,31 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Cart } from "./components/Cart"; 
 import type { CartItem } from "@/features/cart/types";
 import { ProductCartContext } from "./components/CartContext";
+import { removeCartItemApi } from "./api";
 import type { ProductType } from "./interface/Product";
+
+const DESELECTED_STORAGE_KEY = "monokeys:cart-deselected-ids";
 
 type CartContextValue = {
   items: CartItem[];
   selectedItems: CartItem[];
+  cartLoading: boolean;
+  isItemSelected: (item: Pick<CartItem, "cartItemId" | "productId">) => boolean;
   addItem: (item: CartItem) => Promise<boolean | void>;
   updateQuantity: (index: number, quantity: number) => void;
-  toggleItemSelected: (item: CartItem) => void;
+  toggleItemSelected: (item: Pick<CartItem, "cartItemId" | "productId">) => void;
   selectAllItems: (selected: boolean) => void;
+  removeSelectedItems: () => Promise<void>;
   clearSelectedItems: () => void;
   clearCart: () => void;
-  openCart: (tab?: 'standard' | 'custom') => void;
+  openCart: () => void;
   closeCart: () => void;
-  activeTab: 'standard' | 'custom';
-  setActiveTab: (tab: 'standard' | 'custom') => void;
 };
 
-function getItemSelectionKey(item: Pick<CartItem, "cartItemId" | "productId">) {
+export function getItemSelectionKey(item: Pick<CartItem, "cartItemId" | "productId">) {
   return item.cartItemId ? `item-${item.cartItemId}` : `prod-${item.productId}`;
 }
 
@@ -35,7 +39,6 @@ export function useCart() {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartOpen, setCartOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'standard' | 'custom'>('standard');
   const cartCtx = useContext(ProductCartContext);
   const products: ProductType[] = cartCtx?.products || [];
   const handleUpdateCount = cartCtx?.handleUpdateCount;
@@ -44,34 +47,107 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const items = useMemo<CartItem[]>(() => {
     return products.map((p) => {
-      const isCustom = Boolean(
-        p.manualBuildId || p.autoBuildId || p.buildType || p.partType === 'CUSTOM' || p.customDesignData
-      );
+      const itemKind: CartItem["itemKind"] = p.manualBuildId
+        ? "MANUAL_BUILD"
+        : p.autoBuildId
+          ? "AUTO_BUILD"
+          : p.customDesignData
+            ? "CUSTOM_KEYCAP"
+            : "STANDARD";
+      const isBuild = itemKind === "MANUAL_BUILD" || itemKind === "AUTO_BUILD";
+      const buildSummaryLabel = isBuild
+        ? `${itemKind === "AUTO_BUILD" ? "자동 추천" : "수동 조립"} · ${p.includeAssembly ? "조립 대행" : "직접 조립"}`
+        : undefined;
+      const resolvedProductId =
+        p.productId > 0
+          ? p.productId
+          : (p.manualBuildId ?? p.autoBuildId ?? p.cartItemId ?? 0);
       return {
-        // 일반 상품은 실제 product 테이블의 productId를 전달하여 결제/주문 검증 통과
-        // 커스텀 상품은 cartItemId 또는 manualBuildId를 전달
-        productId: String(isCustom ? (p.cartItemId ?? p.manualBuildId ?? p.productId) : p.productId),
+        // 실제 product 레코드(일반 단품·커스텀 키캡)는 productId를 유지하고,
+        // 상품 ID가 없는 수동/자동 빌드만 빌드·장바구니 식별자로 대체합니다.
+        productId: String(resolvedProductId),
         cartItemId: p.cartItemId,
         slug: String(p.productId),
         name: p.name,
         image: p.thumbnailUrl,
-        optionValue: p.customBuildId ? `custom-${p.customBuildId}` : undefined,
-        optionLabel: p.buildName || (p.includeAssembly ? '조립 대행 포함' : undefined),
+        optionValue: p.manualBuildId
+          ? `manual-${p.manualBuildId}`
+          : p.autoBuildId
+            ? `auto-${p.autoBuildId}`
+            : p.customBuildId
+              ? `custom-${p.customBuildId}`
+              : undefined,
+        optionLabel: p.buildName || buildSummaryLabel,
         unitPrice: p.price,
         shippingFee: 0,
         quantity: p.quantity,
+        itemKind,
+        includeAssembly: Boolean(p.includeAssembly),
         buildType: p.buildType as 'MANUAL' | 'AUTO' | undefined,
         manualBuildId: p.manualBuildId,
         autoBuildId: p.autoBuildId,
+        partDetails: p.partDetails,
+        customDesignData: p.customDesignData,
       };
     });
   }, [products]);
 
+  const cartLoading = cartCtx?.cartLoading ?? false;
+  const refreshCart = cartCtx?.refreshCart;
   const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set());
+  const [storageHydrated, setStorageHydrated] = useState(false);
+  const [removingSelected, setRemovingSelected] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DESELECTED_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setDeselectedIds(new Set(parsed.filter((v): v is string => typeof v === "string")));
+        }
+      }
+    } catch {
+      // 스토리지 접근 불가 환경 무시
+    } finally {
+      setStorageHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storageHydrated) return;
+    try {
+      sessionStorage.setItem(DESELECTED_STORAGE_KEY, JSON.stringify([...deselectedIds]));
+    } catch {
+      // 스토리지 접근 불가 환경 무시
+    }
+  }, [deselectedIds, storageHydrated]);
+
+  useEffect(() => {
+    if (cartLoading || !storageHydrated || items.length === 0) return;
+    const validKeys = new Set(items.map((item) => getItemSelectionKey(item)));
+    setDeselectedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const key of prev) {
+        if (validKeys.has(key)) {
+          next.add(key);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [cartLoading, items, storageHydrated]);
+
+  const isItemSelected = useCallback(
+    (item: Pick<CartItem, "cartItemId" | "productId">) => !deselectedIds.has(getItemSelectionKey(item)),
+    [deselectedIds],
+  );
 
   const selectedItems = useMemo(() => {
-    return items.filter((item) => !deselectedIds.has(getItemSelectionKey(item)));
-  }, [items, deselectedIds]);
+    return items.filter((item) => isItemSelected(item));
+  }, [isItemSelected, items]);
 
   const addItem = useCallback(async (item: CartItem) => {
     if (handleAddCart) {
@@ -101,8 +177,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         customDesignData: item.customDesignData,
       });
       if (isSuccess !== false) {
-        // 일반 상품을 담았으면 'standard', 커스텀 상품을 담았으면 'custom' 탭이 즉시 열림
-        setActiveTab(isCustom ? 'custom' : 'standard');
         setCartOpen(true);
         return true;
       }
@@ -113,11 +187,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback((index: number, quantity: number) => {
     const item = items[index];
     if (item && handleUpdateCount) {
-      handleUpdateCount(Number(item.productId), quantity, item.cartItemId);
+      handleUpdateCount(item.cartItemId ?? Number(item.productId), quantity);
     }
   }, [items, handleUpdateCount]);
 
-  const toggleItemSelected = useCallback((item: CartItem) => {
+  const toggleItemSelected = useCallback((item: Pick<CartItem, "cartItemId" | "productId">) => {
     const key = getItemSelectionKey(item);
     setDeselectedIds((prev) => {
       const next = new Set(prev);
@@ -138,6 +212,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items]);
 
+  const removeSelectedItems = useCallback(async () => {
+    if (removingSelected || selectedItems.length === 0) return;
+    const targetIds = selectedItems
+      .map((item) => item.cartItemId ?? Number(item.productId))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (targetIds.length === 0) return;
+
+    setRemovingSelected(true);
+    try {
+      await Promise.all(targetIds.map((id) => removeCartItemApi(id)));
+      if (refreshCart) {
+        await refreshCart();
+      }
+    } finally {
+      setRemovingSelected(false);
+    }
+  }, [refreshCart, removingSelected, selectedItems]);
+
   const clearSelectedItems = useCallback(() => {
     if (handleClearCart) {
       handleClearCart();
@@ -152,29 +244,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setDeselectedIds(new Set());
   }, [handleClearCart]);
 
-  const openCart = useCallback((tab?: 'standard' | 'custom') => {
-    if (tab) {
-      setActiveTab(tab);
-    }
+  const openCart = useCallback(() => {
     setCartOpen(true);
-   }, []);
+  }, []);
 
   const closeCart = useCallback(() => setCartOpen(false), []);
 
   const value = useMemo<CartContextValue>(() => ({
     items,
     selectedItems,
+    cartLoading,
+    isItemSelected,
     addItem,
     updateQuantity,
     toggleItemSelected,
     selectAllItems,
+    removeSelectedItems,
     clearSelectedItems,
     clearCart,
     openCart,
     closeCart,
-    activeTab,
-    setActiveTab
-  }), [addItem, clearCart, clearSelectedItems, closeCart, items, openCart, selectAllItems, selectedItems, toggleItemSelected, updateQuantity, activeTab]);
+  }), [addItem, cartLoading, clearCart, clearSelectedItems, closeCart, isItemSelected, items, openCart, removeSelectedItems, selectAllItems, selectedItems, toggleItemSelected, updateQuantity]);
 
   return (
     <CartContext.Provider value={value}>

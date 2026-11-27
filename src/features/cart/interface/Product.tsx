@@ -1,3 +1,10 @@
+export interface CartBuildPart {
+    productId: number;
+    partType: string;
+    name: string;
+    unitPrice: number;
+}
+
 export interface ProductType {
     cartItemId? : number,        // cart_item 테이블 PK
     productId : number,         // Id
@@ -15,6 +22,7 @@ export interface ProductType {
     buildName : string,         // 완제품 이름
     includeAssembly : boolean   // 조립 대행 공임비 포함 여부
     partProductIds? : number[]      // 부품 구성 (상품 id 리스트)
+    partDetails? : CartBuildPart[]  // 부품 상세 (부품종류·이름·단가)
     customDesignData? : string   // 커스텀 키캡 정보
 }
 

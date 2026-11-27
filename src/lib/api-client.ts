@@ -22,8 +22,16 @@ export class ApiRequestError extends Error {
   }
 }
 
-// 재발급을 시도하지 않는 경로입니다. 로그인 실패·재발급 실패의 401은 재발급으로 해결되지 않습니다.
-const NO_REFRESH_PATHS = ["/api/auth/login", "/api/auth/logout", "/api/auth/refresh"];
+// 재발급을 시도하지 않는 경로 목록입니다.
+// 로그인 상태 확인(/api/auth/me)이나 장바구니 조회(/api/cart)에서 발생한 401은
+// 로그인하지 않은 일반 방문자이므로 무의미한 재발급 네트워크 요청을 차단하여 속도를 높입니다.
+const NO_REFRESH_PATHS = [
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/refresh",
+  "/api/auth/me",
+  "/api/cart"
+];
 
 // 진행 중인 재발급 요청입니다. 여러 요청이 동시에 401을 받아도 재발급은 한 번만 보냅니다.
 let refreshPromise: Promise<boolean> | null = null;

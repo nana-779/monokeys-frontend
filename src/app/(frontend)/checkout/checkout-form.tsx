@@ -10,6 +10,13 @@ import { renderPaymentWidgets } from '@/features/payments/order-widget-rendering
 import { paymentErrorMessage } from '@/features/payments/payment-request'
 import { loadPostcode, postcodeError } from '@/features/user/postcode'
 
+const PART_TYPE_LABELS: Record<string, string> = {
+  HOUSING: '하우징',
+  PCB: '기판',
+  SWITCH: '스위치',
+  KEYCAP: '키캡',
+}
+
 export function CheckoutForm() {
   const { selectedItems } = useCart()
   const [message, setMessage] = useState('')
@@ -467,66 +474,12 @@ export function CheckoutForm() {
         <aside className="h-fit rounded-xl bg-zinc-100 p-7 lg:sticky lg:top-28">
           <h2 className="text-xl font-medium tracking-[-0.03em]">Order summary</h2>
           <div className="my-6 divide-y divide-zinc-200 border-y border-zinc-200">
-            {selectedItems.map((item, index) => {
-              const isBuild = Boolean(item.manualBuildId || item.autoBuildId || item.buildType);
-              const isCustomKeycap = Boolean(!isBuild && item.customDesignData);
-              const isAutoBuild = item.buildType === "AUTO" || Boolean(item.autoBuildId);
-              return (
-                <div
-                  className="flex items-center gap-4 py-4 text-sm"
-                  key={item.cartItemId ?? `${item.productId}-${index}`}
-                >
-                  {/* 1. 상품 썸네일 이미지 */}
-                  {item.image ? (
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="size-16 shrink-0 rounded-md border border-zinc-200 object-cover"
-                    />
-                  ) : (
-                    <div className="flex size-16 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-[10px] text-zinc-400">
-                      NO IMG
-                    </div>
-                  )}
-                  {/* 2. 상품 정보 및 배지 */}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    {/* 장바구니와 동일한 배지 스타일 */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {isBuild ? (
-                        <>
-                          <span className="inline-flex items-center rounded bg-zinc-950 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-                            커스텀 키보드
-                          </span>
-                          <span className="inline-flex items-center rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700">
-                            {isAutoBuild ? "자동 추천" : "수동 조립"}
-                          </span>
-                          <span className="text-[11px] text-zinc-500">
-                            {item.includeAssembly ? "조립 대행" : "직접 조립"}
-                          </span>
-                        </>
-                      ) : isCustomKeycap ? (
-                        <span className="inline-flex items-center rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-                          커스텀 키캡
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
-                          일반 상품
-                        </span>
-                      )}
-                    </div>
-                    <p className="truncate font-medium text-zinc-900">{item.name}</p>
-                    <p className="text-xs text-zinc-500">수량: {item.quantity}개</p>
-                    {item.optionLabel && (
-                      <p className="truncate text-xs text-zinc-400">{item.optionLabel}</p>
-                    )}
-                  </div>
-                  {/* 3. 가격 */}
-                  <strong className="shrink-0 text-sm font-semibold">
-                    {formatPrice(item.unitPrice * item.quantity)}
-                  </strong>
-                </div>
-              );
-            })}
+            {selectedItems.map((item, index) => (
+              <CheckoutOrderItem
+                key={item.cartItemId ?? `${item.productId}-${index}`}
+                item={item}
+              />
+            ))}
             {!selectedItems.length && (
               <p className="py-8 text-center text-sm text-zinc-500">
                 선택된 상품이 없습니다. 장바구니에서 주문할 상품을 선택해 주세요.
@@ -584,4 +537,111 @@ export function CheckoutForm() {
       </dialog>
     </>
   )
+}
+
+function CheckoutOrderItem({ item }: { item: (typeof useCart extends () => { selectedItems: (infer T)[] } ? T : any) }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const isBuild = Boolean(item.manualBuildId || item.autoBuildId || item.buildType);
+  const isCustomKeycap = Boolean(!isBuild && item.customDesignData);
+  const isAutoBuild = item.buildType === 'AUTO' || Boolean(item.autoBuildId);
+  const partDetails = item.partDetails ?? [];
+  return (
+    <div className="py-4 text-sm">
+      <div className="flex items-start gap-4">
+        {/* 1. 상품 썸네일 이미지 */}
+        {item.image ? (
+          <img
+            src={item.image}
+            alt={item.name}
+            className="size-16 shrink-0 rounded-md border border-zinc-200 object-cover"
+          />
+        ) : (
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-[10px] text-zinc-400">
+            NO IMG
+          </div>
+        )}
+        {/* 2. 상품 정보 및 배지 */}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isBuild ? (
+              <>
+                <span className="inline-flex items-center rounded bg-zinc-950 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                  커스텀 키보드
+                </span>
+                <span className="inline-flex items-center rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700">
+                  {isAutoBuild ? '자동 추천' : '수동 조립'}
+                </span>
+                <span className="text-[11px] text-zinc-500">
+                  {item.includeAssembly ? '조립 대행' : '직접 조립'}
+                </span>
+              </>
+            ) : isCustomKeycap ? (
+              <span className="inline-flex items-center rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                커스텀 키캡
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
+                일반 상품
+              </span>
+            )}
+          </div>
+          <p className="truncate font-medium text-zinc-900">{item.name}</p>
+          <p className="text-xs text-zinc-500">수량: {item.quantity}개</p>
+          {item.optionLabel && (
+            <p className="truncate text-xs text-zinc-400">{item.optionLabel}</p>
+          )}
+          {/* ⭐️ 장바구니와 동일한 구성품 보기 토글 버튼 */}
+          {isBuild && (
+            <div className="pt-1">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 transition hover:text-zinc-950"
+                onClick={() => setDetailsOpen((prev) => !prev)}
+              >
+                <span>{detailsOpen ? '구성품 접기' : `구성품 보기 (${partDetails.length || 4}종)`}</span>
+                <span className="text-[10px]">{detailsOpen ? '▴' : '▾'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+        {/* 3. 가격 */}
+        <strong className="shrink-0 text-sm font-semibold">
+          {formatPrice(item.unitPrice * item.quantity)}
+        </strong>
+      </div>
+      {/* ⭐️ [장바구니와 동일한 부품 상세 아코디언 박스] */}
+      {detailsOpen && isBuild && (
+        <div className="mt-3 ml-20 space-y-1.5 rounded-md border border-zinc-200 bg-white p-2.5 text-xs">
+          {partDetails.length > 0 ? (
+            partDetails.map((part: any) => (
+              <div
+                key={`${part.partType}-${part.productId}`}
+                className="flex items-center justify-between gap-2"
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600">
+                    {PART_TYPE_LABELS[part.partType] || part.partType}
+                  </span>
+                  <span className="truncate text-zinc-800" title={part.name}>
+                    {part.name}
+                  </span>
+                </div>
+                <span className="shrink-0 font-medium text-zinc-600">
+                  {formatPrice(part.unitPrice)}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-zinc-500">선택 부품 4종 조합</p>
+          )}
+          <div className="flex items-center justify-between border-t border-dashed border-zinc-200 pt-1.5 text-[11px] text-zinc-500">
+            <span>조립 공임비</span>
+            <span className="font-medium text-zinc-700">
+              {item.includeAssembly ? '+20,000원 (조립 대행)' : '0원 (직접 조립)'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

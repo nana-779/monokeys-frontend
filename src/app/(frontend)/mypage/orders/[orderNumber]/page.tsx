@@ -60,7 +60,7 @@ function OrderDetail({ orderNumber }: { orderNumber: string }) {
     setReceiptError('')
     try {
       await confirmMyDelivery(orderNumber)
-      setDetail({ status: 'ready', order: { ...order, deliveryStatus: 'DELIVERED' } })
+      setDetail({ status: 'ready', order: { ...order, deliveryStatus: 'DELIVERED', receiptConfirmed: true } })
     } catch (error) {
       setReceiptError(error instanceof Error ? error.message : '수령 확인을 저장하지 못했습니다.')
       setAttempt(value => value + 1)
@@ -97,9 +97,10 @@ function OrderDetail({ orderNumber }: { orderNumber: string }) {
             </dd>
             <dt>배송 상태</dt><dd><OrderStatus order={order} /></dd>
           </dl>
-          {order.deliveryStatus === 'SHIPPING' && ['ORDERED', 'CONFIRMED'].includes(order.orderStatus) && (
+          {!order.receiptConfirmed && ['SHIPPING','DELIVERED'].includes(order.deliveryStatus ?? '') && ['ORDERED', 'CONFIRMED'].includes(order.orderStatus) && (
             <button className="rounded-md border px-4 py-2 text-sm" disabled={confirming} onClick={() => confirmReceipt(order)}>수령 확인</button>
           )}
+          {order.receiptConfirmed && order.deliveryStatus === 'DELIVERED' && <Link className="underline" href={`/checkout/refund/${encodeURIComponent(orderNumber)}`}>반품 신청</Link>}
           {receiptError && <p role="alert" className="text-sm">{receiptError}</p>}
           <div className="space-y-3 border-t border-neutral-200 pt-4">
             <h2 className="text-sm font-semibold">주문 상품</h2>

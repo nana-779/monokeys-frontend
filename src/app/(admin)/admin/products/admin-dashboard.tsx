@@ -22,7 +22,9 @@ import { ProductImage } from "@/components/common/product-image";
 
 import AdminOrders from "@/features/admin/orders/admin-orders";
 
-type View = "register" | "list" | "edit" | "orders";
+import { AdminRefunds } from "@/features/admin/orders/admin-refunds";
+
+type View = "register" | "list" | "edit" | "orders" | "refunds";
 type IconName =
   | "box"
   | "plus"
@@ -1921,6 +1923,7 @@ export default function AdminDashboard({
               icon: "list" as IconName,
             },
             { id: "orders" as View, label: "주문/배송 관리", icon: "box" as IconName },
+            { id: "refunds" as View, label: "취소/반품 관리", icon: "list" as IconName },
           ].map((item) => {
             const active =
               view === item.id || (view === "edit" && item.id === "list");
@@ -1975,7 +1978,7 @@ export default function AdminDashboard({
             <div className="hidden items-center gap-2 text-xs text-zinc-400 sm:flex">
               <span>관리자</span>
               <Icon name="chevron" size={13} />
-              <span className="font-medium text-zinc-600">{view === "orders" ? "주문/배송 관리" : "상품"}</span>
+              <span className="font-medium text-zinc-600">{view === "refunds" ? "취소/반품 관리" : view === "orders" ? "주문/배송 관리" : "상품"}</span>
               {view === "edit" && (
                 <>
                   <Icon name="chevron" size={13} />
@@ -2002,9 +2005,9 @@ export default function AdminDashboard({
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold tracking-[-0.035em] text-zinc-950">
-                {view === "orders" ? "주문/배송 관리" : pageTitle}
+                {view === "refunds" ? "취소/반품 관리" : view === "orders" ? "주문/배송 관리" : pageTitle}
               </h1>
-              <p className="mt-1.5 text-sm text-zinc-500">{view === "orders" ? "주문 내역을 확인하고 배송 준비 중인 주문에 송장을 등록하세요." : pageDescription}</p>
+              <p className="mt-1.5 text-sm text-zinc-500">{view === "refunds" ? "최근 접수된 요청부터 표시합니다." : view === "orders" ? "주문 내역을 확인하고 배송 준비 중인 주문에 송장을 등록하세요." : pageDescription}</p>
             </div>
             {view === "list" && (
               <button
@@ -2017,7 +2020,7 @@ export default function AdminDashboard({
             )}
           </div>
 
-          {view !== "orders" && (categoryError ? (
+          {view !== "orders" && view !== "refunds" && (categoryError ? (
             <p role="alert" className="mb-4 text-sm text-red-700">
               {categoryError}{" "}
               <button
@@ -2037,7 +2040,7 @@ export default function AdminDashboard({
             </p>
           ))}
 
-          {view === "orders" ? <AdminOrders /> : view === "list" ? (
+          {view === "refunds" ? <AdminRefunds /> : view === "orders" ? <AdminOrders /> : view === "list" ? (
             <ProductList
               categories={categories}
               products={products}

@@ -8,7 +8,7 @@ const summaryLabels = {
   FULL: '전액 취소',
   REVIEW_REQUIRED: '결과 확인 필요',
 }
-const entryLabels = { REQUESTED: '처리 중 또는 결과 확인 필요', COMPLETED: '취소 확인', REJECTED: '취소 실패' }
+const entryLabels = { REQUESTED: '처리 중 또는 결과 확인 필요', COMPLETED: '취소 확인', REJECTED: '거절 또는 실패', PENDING_APPROVAL: '승인 대기', WITHDRAWN: '철회', AWAITING_RETURN: '보류' }
 const timeFormat = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium',
   timeStyle: 'short',

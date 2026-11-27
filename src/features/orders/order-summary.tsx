@@ -6,6 +6,7 @@ const deliveryLabels: Record<NonNullable<MyOrder['deliveryStatus']>, string> = {
   PREPARING: '배송 준비',
   SHIPPING: '배송 중',
   DELIVERED: '배송 완료',
+  CANCELLED: '취소 완료',
   RETURNED: '반품 완료',
 }
 

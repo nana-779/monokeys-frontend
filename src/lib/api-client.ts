@@ -8,6 +8,7 @@ export type ApiErrorBody = {
   message?: string;
   error?: string;
   fieldErrors?: Record<string, string>;
+  data?: { code?: unknown } | null;
 };
 
 // HTTP 상태 코드와 서버 메시지를 함께 보관하는 API 오류입니다.
@@ -16,6 +17,8 @@ export class ApiRequestError extends Error {
     message: string,
     public readonly status: number,
     public readonly fieldErrors?: Record<string, string>,
+    public readonly code?: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -30,7 +33,11 @@ const NO_REFRESH_PATHS = [
   "/api/auth/logout",
   "/api/auth/refresh",
   "/api/auth/me",
-  "/api/cart"
+  "/api/cart",
+  // 인증번호 발송·검증과 공개 회원가입은 재발급 후 중복 실행하지 않습니다.
+  "/api/auth/email/send",
+  "/api/auth/email/verify",
+  "/api/users/signup",
 ];
 
 // 진행 중인 재발급 요청입니다. 여러 요청이 동시에 401을 받아도 재발급은 한 번만 보냅니다.
@@ -56,6 +63,14 @@ function refreshAccessToken(): Promise<boolean> {
 // Next.js 서버에서 보낸 요청에는 브라우저 쿠키가 없어 재발급할 수 없습니다.
 function canRefresh(path: string): boolean {
   return typeof window !== "undefined" && !NO_REFRESH_PATHS.some((p) => path.startsWith(p));
+}
+
+// Retry-After는 대기 초 또는 HTTP 날짜로 올 수 있습니다. 읽을 수 없으면 호출 화면에서 대기값을 정합니다.
+function readRetryAfter(headers: Headers): number | undefined {
+  const value = headers.get("Retry-After")?.trim();
+  if (!value) return undefined;
+  const seconds = /^\d+$/.test(value) ? Number(value) : Math.ceil((Date.parse(value) - Date.now()) / 1000);
+  return Number.isSafeInteger(seconds) ? Math.max(0, seconds) : undefined;
 }
 
 // 모든 API 요청에 JSON 헤더와 세션 쿠키를 공통 적용합니다.
@@ -92,9 +107,12 @@ export async function apiRequest<T>(
   if (!response.ok) {
     let detail = "";
     let fieldErrors: Record<string, string> | undefined;
+    let code: string | undefined;
     try {
       const body = (await response.json()) as ApiErrorBody;
       detail = body.message || body.error || "";
+      // 이메일 인증 오류의 분류값은 공통 응답 data 안에 들어 있습니다.
+      if (typeof body.data?.code === "string") code = body.data.code;
       // 가입 폼이 입력란별 오류를 표시할 수 있도록 문자열 메시지만 전달합니다.
       if (
         body.fieldErrors &&
@@ -114,6 +132,8 @@ export async function apiRequest<T>(
       detail || `API request failed (${response.status})`,
       response.status,
       fieldErrors,
+      code,
+      readRetryAfter(response.headers),
     );
   }
 

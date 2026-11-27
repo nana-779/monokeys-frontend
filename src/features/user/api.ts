@@ -10,6 +10,7 @@ export type CustomerSignupRequest = {
   address: string
   detailAddress: string
   termsConsent: { serviceTerms: boolean; privacyPolicy: boolean }
+  verificationToken: string
 }
 
 type MemberApiResponse<T> = { success?: unknown; message?: unknown; data?: T }
@@ -36,9 +37,38 @@ export async function checkSignupEmail(email: string, signal: AbortSignal): Prom
   return result.available
 }
 
-/** 팀 화면의 평면 요청 형식을 전송하며, 계약된 201 응답을 받은 경우에만 가입 완료로 처리합니다. */
-export async function signUpCustomer(input: CustomerSignupRequest): Promise<void> {
-  await memberRequest('/api/users/signup', { method: 'POST', body: JSON.stringify(input) }, 201)
+// 서버가 발급한 ID와 시간은 응답 형식을 확인한 뒤 타이머와 가입에 사용합니다.
+function validSeconds(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+}
+
+export async function sendSignupEmailCode(email: string, signal: AbortSignal) {
+  const result = await memberRequest<{
+    challengeId?: unknown
+    expiresInSeconds?: unknown
+    resendAfterSeconds?: unknown
+  }>('/api/auth/email/send', { method: 'POST', signal, body: JSON.stringify({ email }) }, 200)
+  if (typeof result?.challengeId !== 'string' || !result.challengeId
+      || !validSeconds(result.expiresInSeconds) || !validSeconds(result.resendAfterSeconds)) {
+    throw new Error('인증번호 발송 결과를 확인하지 못했습니다.')
+  }
+  return { challengeId: result.challengeId, expiresInSeconds: result.expiresInSeconds, resendAfterSeconds: result.resendAfterSeconds }
+}
+
+export async function verifySignupEmailCode(email: string, challengeId: string, code: string, signal: AbortSignal) {
+  // 인증번호를 숫자로 변환하지 않아 앞자리 0도 서버까지 전달합니다.
+  const result = await memberRequest<{ verificationToken?: unknown; expiresInSeconds?: unknown }>(
+    '/api/auth/email/verify', { method: 'POST', signal, body: JSON.stringify({ email, challengeId, code }) }, 200,
+  )
+  if (typeof result?.verificationToken !== 'string' || !result.verificationToken || !validSeconds(result.expiresInSeconds)) {
+    throw new Error('이메일 인증 결과를 확인하지 못했습니다.')
+  }
+  return { verificationToken: result.verificationToken, expiresInSeconds: result.expiresInSeconds }
+}
+
+/** 팀 화면의 평면 요청과 이메일 인증 토큰을 전송합니다. 201 응답을 받은 경우에만 가입 완료로 처리합니다. */
+export async function signUpCustomer(input: CustomerSignupRequest, signal: AbortSignal): Promise<void> {
+  await memberRequest('/api/users/signup', { method: 'POST', signal, body: JSON.stringify(input) }, 201)
 }
 
 async function requestWithdrawal<T>(

@@ -67,11 +67,11 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       },
       finalQuantity
     );
+
     if (success) {
-      await refreshCart(); // 장바구니 목록 최신화
-      return true;         // 장바구니 서랍 오픈
+      await refreshCart(); // 장바구니 최신화
     }
-    return false;
+    return success; // 장바구니 서랍 오픈
   }
     const isCustom = Boolean(
       newProduct.manualBuildId || newProduct.autoBuildId ||
@@ -100,11 +100,11 @@ export function ProductCartProvider({ children }: { children: ReactNode }) {
       ? { manualBuildId: newProduct.manualBuildId, autoBuildId: newProduct.autoBuildId }
       : { productId: newProduct.productId };
     const success = await addCartItemApi(targetPayload, quantityToAdd);
+
     if (success) {
       await refreshCart(); // 장바구니 최신화
-      return true;
     }
-    return false;
+    return success;
   }
 
   // 수량 변경 (+ / -)

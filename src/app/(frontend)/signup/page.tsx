@@ -164,9 +164,19 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!signupRetryUntil) return
-    const timer = window.setTimeout(() => setSignupRetryUntil(0),
-      Math.min(2_147_483_647, Math.max(0, signupRetryUntil - Date.now())))
-    return () => window.clearTimeout(timer)
+    let timer: number | undefined
+    const unlockWhenElapsed = () => {
+      const remaining = signupRetryUntil - Date.now()
+      if (remaining <= 0) {
+        setSignupRetryUntil(0)
+        return
+      }
+      timer = window.setTimeout(unlockWhenElapsed, Math.min(2_147_483_647, remaining))
+    }
+    unlockWhenElapsed()
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
   }, [signupRetryUntil])
 
   // ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ export type OrderRefundHistory = {
     reason: string
     requestedAt: string
     canceledAt: string | null
-    status: 'REQUESTED' | 'COMPLETED' | 'REJECTED'
+    status: 'REQUESTED' | 'COMPLETED' | 'REJECTED' | 'PENDING_APPROVAL' | 'WITHDRAWN' | 'AWAITING_RETURN'
     effect: 'PARTIAL' | 'FULL' | null
   }>
 }

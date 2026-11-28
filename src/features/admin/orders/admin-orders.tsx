@@ -10,6 +10,7 @@ const labels: Record<string, string> = {
   PENDING: '결제 대기',
   ORDERED: '주문 완료',
   CANCELLED: '취소',
+  REFUNDED: '환불 완료',
   CONFIRMED: '구매 확정',
 }
 const headings = [

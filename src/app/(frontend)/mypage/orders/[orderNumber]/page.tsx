@@ -60,7 +60,7 @@ function OrderDetail({ orderNumber }: { orderNumber: string }) {
     setReceiptError('')
     try {
       await confirmMyDelivery(orderNumber)
-      setDetail({ status: 'ready', order: { ...order, deliveryStatus: 'DELIVERED' } })
+      setDetail({ status: 'ready', order: { ...order, deliveryStatus: 'DELIVERED', receiptConfirmed: true } })
     } catch (error) {
       setReceiptError(error instanceof Error ? error.message : '수령 확인을 저장하지 못했습니다.')
       setAttempt(value => value + 1)
@@ -96,10 +96,14 @@ function OrderDetail({ orderNumber }: { orderNumber: string }) {
               {[order.postalCode && `(${order.postalCode})`, order.roadAddress, order.detailAddress].filter(Boolean).join(' ') || '—'}
             </dd>
             <dt>배송 상태</dt><dd><OrderStatus order={order} /></dd>
+            {order.trackingCompany && <><dt>택배사</dt><dd>{order.trackingCompany}</dd></>}
+            {order.trackingNumber && <><dt>운송장 번호</dt><dd className="break-all tabular-nums">{order.trackingNumber}</dd></>}
           </dl>
-          {order.deliveryStatus === 'SHIPPING' && ['ORDERED', 'CONFIRMED'].includes(order.orderStatus) && (
-            <button className="rounded-md border px-4 py-2 text-sm" disabled={confirming} onClick={() => confirmReceipt(order)}>수령 확인</button>
+          {!order.receiptConfirmed && ['SHIPPING','DELIVERED'].includes(order.deliveryStatus ?? '') && ['ORDERED', 'CONFIRMED'].includes(order.orderStatus) && (
+            <div className="space-y-2"><p className="text-sm">상품을 받으셨다면 수령 확인 후 반품/환불을 신청할 수 있습니다.</p>
+            <button className="rounded-md border px-4 py-2 text-sm" disabled={confirming} onClick={() => confirmReceipt(order)}>수령 확인</button></div>
           )}
+          {order.receiptConfirmed && order.deliveryStatus === 'DELIVERED' && <Link className="underline" href={`/checkout/refund/${encodeURIComponent(orderNumber)}`}>반품/환불 신청</Link>}
           {receiptError && <p role="alert" className="text-sm">{receiptError}</p>}
           <div className="space-y-3 border-t border-neutral-200 pt-4">
             <h2 className="text-sm font-semibold">주문 상품</h2>

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ApiRequestError } from '@/lib/api-client'
 import { formatPrice } from '@/lib/store-shared'
-import { readOrderRefundHistory, readOrderRefundPreview } from '@/features/payments/order-refund-api'
+import { RefundWorkflow } from '@/features/payments/refund-workflow'
 import { readMyOrders, type MyOrder } from './my-orders-api'
 import { OrderItems, OrderStatus } from './order-summary'
 
@@ -25,30 +25,9 @@ type OrderListState =
   | { status: 'error'; loginRequired: boolean }
   | { status: 'ready'; orders: MyOrder[] }
 
-type RefundAction = 'cancel' | 'history' | 'pending' | 'unavailable' | 'error'
-
-// 사전 확인과 환불 이력을 대조해 전액 취소, 결과 재확인 또는 내역 조회로 연결합니다.
-async function readRefundAction(orderNumber: string, signal: AbortSignal): Promise<RefundAction> {
-  try {
-    const preview = await readOrderRefundPreview(orderNumber, signal)
-    if (preview.paymentStatus === 'CANCELLED') return 'history'
-    const history = await readOrderRefundHistory(orderNumber, signal)
-    if (history.entries.some((entry) => entry.status === 'REQUESTED')) return 'pending'
-    if (preview.cancellationEnabled && preview.status === 'PRECHECK_PASSED' && history.status === 'NONE'
-      && preview.localRemainingAmount !== null && preview.localRemainingAmount > 0
-      && preview.localRemainingAmount === preview.paymentAmount && preview.localRemainingAmount === history.remainingAmount) {
-      return 'cancel'
-    }
-    return history.entries.length > 0 ? 'history' : 'unavailable'
-  } catch {
-    return 'error'
-  }
-}
-
 export function MyOrderList() {
   const [state, setState] = useState<OrderListState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  const [refundActions, setRefundActions] = useState<Record<string, RefundAction>>({})
   const [months, setMonths] = useState(3)
   const cutoff = firstOrderDate(months)
   const visibleOrders = state.status === 'ready' ? state.orders.filter((order) => order.orderedAt.slice(0, 10) >= cutoff) : []
@@ -69,28 +48,8 @@ export function MyOrderList() {
     return () => controller.abort()
   }, [attempt])
 
-  useEffect(() => {
-    if (state.status !== 'ready') return
-    const controller = new AbortController()
-    // 상품은 주문 목록 응답에 포함되므로 화면에 표시되는 결제 완료 주문의 취소 여부만 따로 확인합니다.
-    const candidates = state.orders.filter((order) => order.orderedAt.slice(0, 10) >= cutoff
-      && order.orderStatus === 'ORDERED' && order.paymentStatus === 'PAID')
-    async function loadRefundActions() {
-      for (let index = 0; index < candidates.length && !controller.signal.aborted; index += 4) {
-        const actions = await Promise.all(candidates.slice(index, index + 4).map(async ({ orderNumber }) => [
-          orderNumber,
-          await readRefundAction(orderNumber, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])),
-        ] as const))
-        if (!controller.signal.aborted) setRefundActions((current) => ({ ...current, ...Object.fromEntries(actions) }))
-      }
-    }
-    void loadRefundActions()
-    return () => controller.abort()
-  }, [state, cutoff])
-
   function retry() {
     setState({ status: 'loading' })
-    setRefundActions({})
     setAttempt((value) => value + 1)
   }
 
@@ -101,7 +60,6 @@ export function MyOrderList() {
           <button key={period.months} type="button" aria-pressed={months === period.months}
             onClick={() => {
               if (months === period.months) return
-              setRefundActions({})
               setMonths(period.months)
             }}
             className="min-w-20 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white">
@@ -128,19 +86,14 @@ export function MyOrderList() {
         ) : (
           <ul className="divide-y divide-neutral-300 border-y border-neutral-300">
             {visibleOrders.map((order) => {
-              const action = order.orderStatus === 'CANCELLED' || order.paymentStatus === 'CANCELLED'
-                ? 'history'
-                : order.orderStatus === 'ORDERED' && order.paymentStatus === 'PAID'
-                  ? refundActions[order.orderNumber]
-                  : 'unavailable'
               return (
                 <li key={order.orderNumber} className="space-y-3 px-2 py-4">
                   <h2 className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-baseline gap-3 text-sm">
                     <time className="border-r border-neutral-300 text-xs font-semibold tabular-nums" dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10).replaceAll('-', '.')}</time>
                     <span className="break-all">{order.orderNumber}</span>
                   </h2>
-                  <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_4rem_4rem] items-center gap-x-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_7rem_4rem_4.5rem_4.5rem] md:gap-x-2">
-                    <div className="col-span-4 min-w-0 md:col-span-1">
+                  <div className="grid grid-cols-2 items-center gap-x-3 gap-y-3 sm:grid-cols-[1fr_1fr_6rem_7rem] lg:grid-cols-[minmax(0,1fr)_6rem_5rem_6rem_7rem]">
+                    <div className="col-span-full min-w-0 lg:col-span-1">
                       <OrderItems items={order.items} alignedWithOrderNumber />
                     </div>
                     <div className="text-center text-xs text-neutral-600">
@@ -148,25 +101,13 @@ export function MyOrderList() {
                       <p className="font-semibold tabular-nums">{order.paymentAmount === null ? '—' : formatPrice(order.paymentAmount)}</p>
                     </div>
                     <div className="text-center"><OrderStatus order={order} /></div>
-                      <Link href={`/mypage/orders/${encodeURIComponent(order.orderNumber)}`} prefetch={false}
-                        className="justify-self-center rounded-md border border-neutral-300 px-2 py-2 text-center text-xs font-semibold">
-                        주문 상세
-                      </Link>
+                    <Link href={`/mypage/orders/${encodeURIComponent(order.orderNumber)}`} prefetch={false}
+                      className="inline-flex h-9 w-24 max-w-full justify-self-center items-center justify-center whitespace-nowrap rounded-md border border-neutral-300 px-2 text-xs font-semibold">
+                      주문 상세
+                    </Link>
                     <div className="grid justify-items-center gap-1 text-center text-xs">
-                      {(action === 'unavailable' || action === 'history' || action === 'pending') && <span className="text-neutral-500">취소불가</span>}
-                      {!action && <span className="text-neutral-500">확인 중</span>}
-                      {(action === 'cancel' || action === 'history' || action === 'pending') && (
-                        <Link
-                          href={`/checkout/refund/${encodeURIComponent(order.orderNumber)}${action === 'history' ? '?view=history' : ''}`}
-                          prefetch={false}
-                          className="inline-flex rounded-md border border-neutral-300 px-2 py-2 text-xs font-semibold"
-                        >
-                          {action === 'cancel' ? '주문 취소' : action === 'pending' ? '취소 결과 다시 확인' : '환불 내역'}
-                        </Link>
-                      )}
-                      {action === 'error' && (
-                        <button type="button" onClick={retry} className="text-sm underline">취소 가능 여부 다시 확인</button>
-                      )}
+                      {order.paymentStatus === 'PAID' || order.paymentStatus === 'CANCELLED'
+                        ? <RefundWorkflow orderNumber={order.orderNumber} shipping={order.deliveryStatus === 'SHIPPING' || order.deliveryStatus === 'DELIVERED'} compact /> : '—'}
                     </div>
                   </div>
                 </li>

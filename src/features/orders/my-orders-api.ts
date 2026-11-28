@@ -4,13 +4,16 @@ export type MyOrder = {
   orderNumber: string
   orderedAt: string
   paymentAmount: number | null
-  orderStatus: 'PENDING' | 'ORDERED' | 'CANCELLED' | 'CONFIRMED'
+  orderStatus: 'PENDING' | 'ORDERED' | 'CANCELLED' | 'CONFIRMED' | 'REFUNDED'
   paymentStatus: 'READY' | 'PAID' | 'FAILED' | 'CANCELLED' | null
-  deliveryStatus: 'PREPARING' | 'SHIPPING' | 'DELIVERED' | 'RETURNED' | null
+  deliveryStatus: 'PREPARING' | 'SHIPPING' | 'DELIVERED' | 'RETURNED' | 'CANCELLED' | null
   items: Array<{ orderItemId: number; productName: string; unitPrice: number; quantity: number; thumbnailUrl: string | null }>
 }
 
 export type MyOrderDetail = MyOrder & {
+  trackingCompany: string | null
+  trackingNumber: string | null
+  receiptConfirmed: boolean
   ordererName: string
   ordererPhone: string
   postalCode: string

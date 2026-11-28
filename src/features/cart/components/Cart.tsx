@@ -163,10 +163,15 @@ export function Cart({ open, onClose }: CartProps) {
             </div>
             <button
               id="Cart-Payment-Button"
-              className={`transition-all duration-150 ${selectedQuantity > 0 ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99]" : "off"}`}
+              className={`transition-all duration-150 ${
+                selectedLineCount > 0 
+                  ? "bg-zinc-800 hover:bg-zinc-950 active:scale-[0.99] cursor-pointer" 
+                  : "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-60 pointer-events-none"
+              }`}
               type="button"
-              disabled={selectedQuantity === 0}
+              disabled={selectedLineCount === 0}
               onClick={() => {
+                if (selectedLineCount === 0) return;
                 onClose();
                 router.push("/checkout");
               }}

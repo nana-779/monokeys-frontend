@@ -92,8 +92,8 @@ export function MyOrderList() {
                     <time className="border-r border-neutral-300 text-xs font-semibold tabular-nums" dateTime={order.orderedAt}>{order.orderedAt.slice(0, 10).replaceAll('-', '.')}</time>
                     <span className="break-all">{order.orderNumber}</span>
                   </h2>
-                  <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_4rem_4rem] items-center gap-x-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_7rem_4rem_4.5rem_4.5rem] md:gap-x-2">
-                    <div className="col-span-4 min-w-0 md:col-span-1">
+                  <div className="grid grid-cols-2 items-center gap-x-3 gap-y-3 sm:grid-cols-[1fr_1fr_6rem_7rem] lg:grid-cols-[minmax(0,1fr)_6rem_5rem_6rem_7rem]">
+                    <div className="col-span-full min-w-0 lg:col-span-1">
                       <OrderItems items={order.items} alignedWithOrderNumber />
                     </div>
                     <div className="text-center text-xs text-neutral-600">
@@ -101,13 +101,13 @@ export function MyOrderList() {
                       <p className="font-semibold tabular-nums">{order.paymentAmount === null ? '—' : formatPrice(order.paymentAmount)}</p>
                     </div>
                     <div className="text-center"><OrderStatus order={order} /></div>
-                      <Link href={`/mypage/orders/${encodeURIComponent(order.orderNumber)}`} prefetch={false}
-                        className="justify-self-center rounded-md border border-neutral-300 px-2 py-2 text-center text-xs font-semibold">
-                        주문 상세
-                      </Link>
+                    <Link href={`/mypage/orders/${encodeURIComponent(order.orderNumber)}`} prefetch={false}
+                      className="inline-flex h-9 w-24 max-w-full justify-self-center items-center justify-center whitespace-nowrap rounded-md border border-neutral-300 px-2 text-xs font-semibold">
+                      주문 상세
+                    </Link>
                     <div className="grid justify-items-center gap-1 text-center text-xs">
                       {order.paymentStatus === 'PAID' || order.paymentStatus === 'CANCELLED'
-                        ? <RefundWorkflow orderNumber={order.orderNumber} compact /> : '—'}
+                        ? <RefundWorkflow orderNumber={order.orderNumber} shipping={order.deliveryStatus === 'SHIPPING' || order.deliveryStatus === 'DELIVERED'} compact /> : '—'}
                     </div>
                   </div>
                 </li>

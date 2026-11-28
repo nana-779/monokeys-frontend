@@ -11,6 +11,8 @@ export type MyOrder = {
 }
 
 export type MyOrderDetail = MyOrder & {
+  trackingCompany: string | null
+  trackingNumber: string | null
   receiptConfirmed: boolean
   ordererName: string
   ordererPhone: string

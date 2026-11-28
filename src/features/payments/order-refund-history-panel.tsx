@@ -25,12 +25,10 @@ export function OrderRefundHistoryPanel({ history }: { history: OrderRefundHisto
         <p className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium">{summaryLabels[history.status]}</p>
       </div>
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 rounded-lg bg-neutral-50 p-4 text-sm">
-        <dt>최초 결제금액</dt>
+        <dt>총 결제금액</dt>
         <dd>{money(history.paymentAmount)}</dd>
-        <dt>누적 취소금액</dt>
+        <dt>결제 취소금액</dt>
         <dd>{money(history.completedAmount)}</dd>
-        <dt>로컬 기록 기준 잔액</dt>
-        <dd>{money(history.remainingAmount)}</dd>
       </dl>
       {history.status === 'REVIEW_REQUIRED' && (
         <p role="alert" className="text-sm text-amber-800">결제금액과 취소 내역을 확인 중입니다.</p>
@@ -59,7 +57,7 @@ export function OrderRefundHistoryPanel({ history }: { history: OrderRefundHisto
       )}
       {(history.completedAmount ?? 0) > 0 && (
         <p className="text-xs text-neutral-600">
-          결제사에서 취소를 확인한 뒤 실제 카드·계좌에 환불이 반영되기까지 시간이 걸릴 수 있어요.
+          결제사에서 취소를 확인한 뒤 실제 카드·계좌에 환불이 반영되기까지 3~5 영업일이 소요될 수 있습니다.
         </p>
       )}
     </section>

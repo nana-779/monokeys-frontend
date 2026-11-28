@@ -3,7 +3,7 @@ import { formatPrice } from '@/lib/store-shared'
 import type { MyOrder } from './my-orders-api'
 
 const deliveryLabels: Record<NonNullable<MyOrder['deliveryStatus']>, string> = {
-  PREPARING: '배송 준비',
+  PREPARING: '배송 준비중',
   SHIPPING: '배송 중',
   DELIVERED: '배송 완료',
   CANCELLED: '취소 완료',
